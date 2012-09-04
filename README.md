@@ -154,31 +154,6 @@ You can utilize three system events: before, after and shutdown
         }
     });
 
-## Assets
-
-Define your assets, and use them in your views:
-
-    $app->registerAsset("main", array(
-        array("file" => "assets/vendor/jquery.js"),
-        array("file" => "assets/base.css"),
-        array("file" => "assets/site.css"),
-        array("file" => "assets/site.js"),
-    ));
- 
-In your view:
-
-    <!DOCTYPE HTML>
-    <html lang="en-US">
-    <head>
-        <meta charset="UTF-8">
-        <title>Assets</title>
-        <?php echo $this->style("assets:main");?>
-        <?php echo $this->script("assets:main");?>
-    </head>
-    <body>
-            ...
-    </body>
-    </html>
 
 ## Helpers
 
@@ -194,3 +169,32 @@ You can extend Lime by using your custom helpers:
     $app->helpers["myhelper"] = 'MyHelperClass';
 
     $app("myhelper")->test();
+
+Lime comes with some Helpers included: Cache, Session and Assets
+
+
+## Assets
+
+Lime comes with a built in assets helper. Define your assets, and use them in your views:
+
+    $app("assets")->register("main", array(
+        array("file" => "assets/vendor/jquery.js"),
+        array("file" => "assets/base.css"),
+        array("file" => "assets/site.css"),
+        array("file" => "assets/site.js"),
+    ));
+ 
+In your view:
+
+    <!DOCTYPE HTML>
+    <html lang="en-US">
+    <head>
+        <meta charset="UTF-8">
+        <title>Assets</title>
+        <?php echo $this("assets")->style("main");?>
+        <?php echo $this("assets")->script("main");?>
+    </head>
+    <body>
+            ...
+    </body>
+    </html>

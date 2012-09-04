@@ -191,7 +191,9 @@ class App implements \ArrayAccess {
         self::$apps[$this["name"]] = $this;
 
         // default helpers
-        $this->helpers["cache"] = function_exists('apc_store') ? 'Lime\\CacheApc':'Lime\\CacheMemory';
+        $this->helpers["cache"]   = 'Lime\\Cache';
+        $this->helpers["assets"]  = 'Lime\\Assets';
+        $this->helpers["session"] = 'Lime\\Session';
 
         // register simple autoloader
         spl_autoload_register(function ($class) use($self){
@@ -524,116 +526,12 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [registerAsset description]
-     * @param  String $name   [description]
-     * @param  Array $assets [description]
-     * @return void
-     */
-    public function registerAsset($name, $assets) {
-        
-        $self = $this;
-
-        $this->bind("/assets/{$name}.js", function() use($self, $name, $assets){
-          $self->response["gzip"] = true;
-          $self->response["mime"] = "js";
-          return $self->assets($assets, "js");
-        });
-
-        $this->bind("/assets/{$name}.css", function() use($self, $name, $assets){
-          $self->response["gzip"] = true;
-          $self->response["mime"] = "css";
-          return $self->assets($assets, "css");
-        });
-    }
-
-    /**
-     * [assets description]
-     * @param  Array $assets [description]
-     * @return String         js or css
-     */
-    public function assets($assets, $type) {
-
-      $self = $this;
-
-      $rewriteCssUrls = function($content, $asset) use($self) {
-    
-        $source_dir = dirname($asset["file"]);
-        $root_dir   = $_SERVER['DOCUMENT_ROOT'];
-        
-        preg_match_all('/url\((.*)\)/',$content,$matches);
-
-        $csspath  = "";
-
-        if (strlen($root_dir) < strlen($source_dir)) {
-          $csspath = '/'.trim(str_replace($root_dir, '', $source_dir), "/")."/";
-        } else {
-          // todo
-        }
-
-        foreach($matches[1] as $imgpath){
-          if(!preg_match("#^(http|/|data\:)#",trim($imgpath))){
-            $content = str_replace('url('.$imgpath.')','url('.$csspath.str_replace('"','',$imgpath).')', $content);
-          }
-        }
-
-        return $content;
-      };
-
-      $output = array();
-
-      foreach ($assets as $asset) {
-
-        $asset = array_merge(array(
-          "filters"   => array(),
-          "ext"   => strtolower(array_pop(explode(".", $asset['file'])))
-        ), $asset);
-
-        $file    = $asset['file'];
-        $ext     = $asset['ext'];
-        $content = '';
-
-        if (strpos($file, ':') !== false && $____file = $this->path($file)) {
-         $asset['file'] = $file = $____file;
-        }
-
-        if($ext!=$type) continue;
-
-        switch ($ext) {
-        
-          case 'js':
-            
-            $content = file_get_contents($file);
-            
-            break;
-          
-          case 'css':
-              
-            $content = file_get_contents($file);
-            $content = $rewriteCssUrls($content, $asset);
-            
-            break;
-          
-          default:
-            continue;
-        }
-
-        $output[] = $content;
-      }
-
-      return implode("", $output);
-    }
-
-    /**
      * [style description]
      * @param  String $href [description]
      * @return String       [description]
      */
     public function style($href) {
       
-      if(strpos($href, 'assets:')!==false){
-        $href = $this->routeUrl("/".str_replace("assets:", "assets/", $href).".css");
-      }
-
       return '<link href="'.$href.'" type="text/css" rel="stylesheet" />';
     }
 
@@ -644,9 +542,6 @@ class App implements \ArrayAccess {
      */
     public function script($src){
       
-      if(strpos($src, 'assets:')!==false){
-        $src = $this->routeUrl("/".str_replace("assets:", "assets/", $src).".js");
-      }
       return '<script src="'.$src.'" type="text/javascript"></script>';
     }
 
@@ -970,11 +865,11 @@ class Helper {
 
 } // End helper
 
-class CacheApc extends Helper {
+class Cache extends Helper {
 
   public function read($key, $default=null) {
   
-    if (($cache = \apc_fetch($key)) !== false) {
+    if (($cache = apc_fetch($key)) !== false) {
       return $cache;
     }
 
@@ -982,32 +877,169 @@ class CacheApc extends Helper {
   }
 
   public function write($key, $value, $seconds) {
-    \apc_store($key, $value, $seconds);
+    return apc_store($key, $value, $seconds);
   }
 
   public function remove($key){
-    \apc_delete($key);
+    return apc_delete($key);
+  }
+
+  public function clear(){
+    return apc_clear_cache('user');
   }
 }
 
-class CacheMemory extends Helper {
+class Session extends Helper {
 
-  protected $storage = array();
-
-  protected function read($key, $default=null) {
-
-    return isset($this->storage[$key]) ? $this->storage[$key] : $default;
+  public function init($sessionname=null){
+    
+    if(strlen(session_id())) { session_destroy(); }
+    session_name($sessionname ? $sessionname : $this->app["name"]);
+    session_start();
   }
 
-  public function write($key, $value, $minutes) {
-    $this->storage[$key] = $value;
+  public function write($key, $value){
+    $_SESSION[$key] = $value;
   }
 
-  public function remove($key){
-    if(isset($this->storage[$key])){
-      unset($this->storage[$key]);
+  public function read($key, $default=null){
+    return fetch_from_array($_SESSION, $key, $default);
+  }
+
+  public function delete($key){
+    unset($_SESSION[$key]);
+  }
+
+  public function destroy(){
+    session_destroy();
+  }
+}
+
+class Assets extends Helper {
+
+    /**
+     * [style description]
+     * @param  String $name [description]
+     * @return String       [description]
+     */
+    public function style($name) {
+      
+      $href = $this->app->routeUrl("/assets/{$name}.css");
+      return '<link href="'.$href.'" type="text/css" rel="stylesheet" />';
     }
-  }
+
+    /**
+     * [script description]
+     * @param  String $name [description]
+     * @return String      [description]
+     */
+    public function script($name){
+      
+      $src = $this->app->routeUrl("/assets/{$name}.js");
+ 
+      return '<script src="'.$src.'" type="text/javascript"></script>';
+    }
+
+    /**
+     * [register description]
+     * @param  String $name   [description]
+     * @param  Array $assets [description]
+     * @return void
+     */
+    public function register($name, $assets) {
+        
+        $self = $this;
+
+        $this->app->bind("/assets/{$name}.js", function() use($self, $name, $assets){
+          $self->app->response["gzip"] = true;
+          $self->app->response["mime"] = "js";
+          return $self->assets($assets, "js");
+        });
+
+        $this->app->bind("/assets/{$name}.css", function() use($self, $name, $assets){
+          $self->app->response["gzip"] = true;
+          $self->app->response["mime"] = "css";
+          return $self->assets($assets, "css");
+        });
+    }
+
+    /**
+     * [assets description]
+     * @param  Array $assets [description]
+     * @return String         js or css
+     */
+    public function assets($assets, $type) {
+
+      $self = $this;
+
+      $rewriteCssUrls = function($content, $asset) use($self) {
+    
+        $source_dir = dirname($asset["file"]);
+        $root_dir   = $_SERVER['DOCUMENT_ROOT'];
+        
+        preg_match_all('/url\((.*)\)/',$content,$matches);
+
+        $csspath  = "";
+
+        if (strlen($root_dir) < strlen($source_dir)) {
+          $csspath = '/'.trim(str_replace($root_dir, '', $source_dir), "/")."/";
+        } else {
+          // todo
+        }
+
+        foreach($matches[1] as $imgpath){
+          if(!preg_match("#^(http|/|data\:)#",trim($imgpath))){
+            $content = str_replace('url('.$imgpath.')','url('.$csspath.str_replace('"','',$imgpath).')', $content);
+          }
+        }
+
+        return $content;
+      };
+
+      $output = array();
+
+      foreach ($assets as $asset) {
+
+        $asset = array_merge(array(
+          "filters"   => array(),
+          "ext"   => strtolower(array_pop(explode(".", $asset['file'])))
+        ), $asset);
+
+        $file    = $asset['file'];
+        $ext     = $asset['ext'];
+        $content = '';
+
+        if (strpos($file, ':') !== false && $____file = $this->app->path($file)) {
+         $asset['file'] = $file = $____file;
+        }
+
+        if($ext!=$type) continue;
+
+        switch ($ext) {
+        
+          case 'js':
+            
+            $content = file_get_contents($file);
+            
+            break;
+          
+          case 'css':
+              
+            $content = file_get_contents($file);
+            $content = $rewriteCssUrls($content, $asset);
+            
+            break;
+          
+          default:
+            continue;
+        }
+
+        $output[] = $content;
+      }
+
+      return implode("", $output);
+    }
+
 }
 
 // helper function
