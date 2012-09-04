@@ -1,0 +1,16 @@
+{
+    "name": "lime/lime",
+    "description": "The HP micro-framework",
+    "keywords": ["microframework"],
+    "homepage": "https://github.com/aheinze/Lime",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Artur Heinze",
+            "email": "faulancer@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.3"
+    }
+}
