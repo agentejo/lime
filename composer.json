@@ -1,6 +1,6 @@
 {
     "name": "lime/lime",
-    "description": "The HP micro-framework",
+    "description": "The PHP micro-framework",
     "keywords": ["microframework"],
     "homepage": "https://github.com/aheinze/Lime",
     "license": "MIT",
