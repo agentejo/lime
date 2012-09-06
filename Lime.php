@@ -344,19 +344,19 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [set description]
-     * @param String $key   [description]
-     * @param Misc $value [description]
+     * Put a value in the Lime registry
+     * @param String $key  Key name
+     * @param Misc $value  Value
      */
     public function set($key, $value) {
     	$this->registry[$key] = $value;
     }
 
     /**
-     * [retrieve description]
-     * @param  String $key     [description]
-     * @param  Misc $default [description]
-     * @return Misc          [description]
+     * Get a value from the Lime registry
+     * @param  String $key    
+     * @param  Misc $default
+     * @return Misc          
      */
     public function retrieve($key, $default=null) {
     	return isset($this->registry[$key]) ? $this->registry[$key]:$default;
@@ -399,6 +399,10 @@ class App implements \ArrayAccess {
       }
     }
 
+    /**
+     * Cache helper method
+     * @return Misc 
+     */
     public function cache(){
       
       $args = func_get_args();
@@ -406,18 +410,18 @@ class App implements \ArrayAccess {
       switch(count($args)){
         case 1:
          
-          return false;
+          return $this("cache")->read($args[0]);
         case 2:
-     
+          return $this("cache")->write($args[0], $args[1]);
           break;
       }
     }
 
     /**
-     * [on description]
-     * @param  String $event      [description]
+     * Bind an event to closure
+     * @param  String  $event      [description]
      * @param  Closure $callback   [description]
-     * @param  String $identifier [description]
+     * @param  String  $identifier [description]
      * @return void
      */
     public function on($event,$callback,$identifier=null){
@@ -455,9 +459,9 @@ class App implements \ArrayAccess {
 
     /**
      * Render view.
-     * @param  String $____template [description]
-     * @param  Array  $_____slots   [description]
-     * @return String               [description]
+     * @param  String $____template Path to view
+     * @param  Array  $_____slots   Passed variables
+     * @return String               Rendered view
      */
     public function render($____template, $_____slots = array()) {        
           
@@ -500,9 +504,9 @@ class App implements \ArrayAccess {
 
     /**
      * Escape string.
-     * @param  String $string  [description]
-     * @param  String $charset [description]
-     * @return String          [description]
+     * @param  String $string  
+     * @param  String $charset 
+     * @return String          
      */
     public function escape($string, $charset=null) {
       
@@ -514,11 +518,11 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [param description]
-     * @param  String $index   [description]
-     * @param  Misc $default [description]
-     * @param  Array $source  [description]
-     * @return Misc          [description]
+     * Get request variables
+     * @param  String $index   
+     * @param  Misc $default 
+     * @param  Array $source  
+     * @return Misc          
      */
     public function param($index=null, $default = null, $source = null) {
 
@@ -526,9 +530,9 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [style description]
-     * @param  String $href [description]
-     * @return String       [description]
+     * Get style inc. markup
+     * @param  String $href 
+     * @return String       
      */
     public function style($href) {
       
@@ -536,9 +540,9 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [script description]
-     * @param  String $src [description]
-     * @return String      [description]
+     * Get script inc. markup
+     * @param  String $src 
+     * @return String      
      */
     public function script($src){
       
@@ -546,10 +550,10 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [get description]
-     * @param  String  $path      [description]
-     * @param  Closure  $callback  [description]
-     * @param  Boolean $condition [description]
+     * Bind GET request to route
+     * @param  String  $path
+     * @param  Closure  $callback
+     * @param  Boolean $condition
      * @return void
      */
     public function get($path, $callback, $condition = true){
@@ -558,11 +562,11 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [post description]
-     * @param  String  $path      [description]
-     * @param  Closure  $callback  [description]
-     * @param  Boolean $condition [description]
-     * @return void           [description]
+     * Bind POST request to route
+     * @param  String  $path 
+     * @param  Closure  $callback
+     * @param  Boolean $condition
+     * @return void          
      */
     public function post($path, $callback, $condition = true){
     	if(!$this->req_is("post")) return;
@@ -570,7 +574,7 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [bindClass description]
+     * Bind Class to routes
      * @param  String $class [description]
      * @return void
      */
@@ -594,10 +598,10 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [invoke description]
-     * @param  String $class  [description]
-     * @param  String $action [description]
-     * @param  Array  $params [description]
+     * Invoke Class as controller
+     * @param  String $class
+     * @param  String $action
+     * @param  Array  $params
      * @return Misc
      */
     public function invoke($class, $action="index", $params=array()) {
@@ -608,10 +612,10 @@ class App implements \ArrayAccess {
     }
 
   	/**
-  	 * [bind description]
-     * @param  String  $path      [description]
-     * @param  Closure  $callback  [description]
-     * @param  Boolean $condition [description]
+  	 * Bind request to route
+     * @param  String  $path
+     * @param  Closure  $callback
+     * @param  Boolean $condition
      * @return void
   	 */
   	public function bind($path, $callback, $condition = true) {
@@ -626,8 +630,8 @@ class App implements \ArrayAccess {
   	}
 
   	/**
-  	 * [dispatch description]
-  	 * @param  String $path [description]
+  	 * Dispatch route
+  	 * @param  String $path
   	 * @return Misc
   	 */
   	public function dispatch($path) {
@@ -703,10 +707,10 @@ class App implements \ArrayAccess {
   	}
 
   	/**
-  	 * [render_route description]
-  	 * @param  [type] $route  [description]
-  	 * @param  array  $params [description]
-  	 * @return [type]         [description]
+  	 * Render dispatched route
+  	 * @param  [type] $route
+  	 * @param  array  $params
+  	 * @return String
   	 */
       protected function render_route($route, $params = array()) {
           
@@ -727,9 +731,9 @@ class App implements \ArrayAccess {
       }
 
     /**
-     * [req_is description]
-     * @param  [type] $type [description]
-     * @return [type]       [description]
+     * Request helper function
+     * @param  String $type [description]
+     * @return Boolean
      */
     public function req_is($type){
 
@@ -774,8 +778,8 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [getClientIp description]
-     * @return [type] [description]
+     * Get client ip.
+     * @return String
      */
     public function getClientIp(){
 
@@ -795,16 +799,16 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [getClientLang description]
-     * @return [type] [description]
+     * Get client language
+     * @return String
      */
     public function getClientLang() {
       return strtolower(substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2));
     }
 
     /**
-     * [getSiteUrl description]
-     * @return [type] [description]
+     * Get site url
+     * @return String
      */
     public function getSiteUrl() {
         $url = ($this->req_is("ssl") ? 'https':'http')."://";
