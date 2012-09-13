@@ -950,20 +950,20 @@ class Assets extends Helper {
      * @param  Array $assets [description]
      * @return void
      */
-    public function register($name, $assets) {
+    public function register($name, $assets, $cache=false) {
         
         $self = $this;
 
-        $this->app->bind("/assets/{$name}.js", function() use($self, $name, $assets){
+        $this->app->bind("/assets/{$name}.js", function() use($self, $name, $assets, $cache){
           $self->app->response["gzip"] = true;
           $self->app->response["mime"] = "js";
-          return $self->assets($assets, "js");
+          return $self->assets($assets, "js", $cache);
         });
 
-        $this->app->bind("/assets/{$name}.css", function() use($self, $name, $assets){
+        $this->app->bind("/assets/{$name}.css", function() use($self, $name, $assets, $cache){
           $self->app->response["gzip"] = true;
           $self->app->response["mime"] = "css";
-          return $self->assets($assets, "css");
+          return $self->assets($assets, "css", $cache);
         });
     }
 
@@ -971,8 +971,16 @@ class Assets extends Helper {
      * [assets description]
      * @param  Array $assets [description]
      * @return String         js or css
+     * @return Integer        cache time
      */
-    public function assets($assets, $type) {
+    public function assets($assets, $type, $cache = false) {
+
+      $app = $this->app;
+
+      if($cache && $app("cache")->read("$assets.$type", false)) {
+        return $app("cache")->read("$assets.$type");
+      }
+
 
       $self = $this;
 
@@ -1041,7 +1049,14 @@ class Assets extends Helper {
         $output[] = $content;
       }
 
-      return implode("", $output);
+
+      $output = implode("", $output);
+
+      if($cache){
+        $app("cache")->write("$assets.$type", $output, $cache);
+      }
+
+      return $output;
     }
 
 }
