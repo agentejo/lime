@@ -175,6 +175,7 @@ class App implements \ArrayAccess {
 
         $this->registry = array_merge(array(
           'debug'     => true,
+          'route'     => isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] : "/",
           'charset'   => 'UTF-8',
           'base_url'  => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
           'base_route'=> implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1))
@@ -221,9 +222,9 @@ class App implements \ArrayAccess {
 
     /**
      * Returns a closure that stores the result of the given closure 
-     * @param  String  $name     [description]
-     * @param  Closure $callable [description]
-     * @return Object            [description]
+     * @param  String  $name     
+     * @param  Closure $callable 
+     * @return Object            
      */
     public function share($name, Closure $callable) {
         $this[$name] = function ($c) use ($callable) {
@@ -242,13 +243,9 @@ class App implements \ArrayAccess {
      * @param  String $route Route to parse
      * @return void
      */
-    public function run($route = null) {
+    public function run() {
       
       $self = $this;
-
-      if(!$route){
-        $route = isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] : "/";
-      }
 
       register_shutdown_function(function() use($self){
 
@@ -293,12 +290,10 @@ class App implements \ArrayAccess {
 
         $self->trigger("shutdown");
       });
-     
-      $this->set("route", $route);
 
       $this->trigger("before");
 
-      $this->response["body"] = $this->dispatch($route);
+      $this->response["body"] = $this->dispatch($this["route"]);
 
       if ($this->response["gzip"] && !ob_start("ob_gzhandler")) {
         ob_start();
@@ -419,9 +414,9 @@ class App implements \ArrayAccess {
 
     /**
      * Bind an event to closure
-     * @param  String  $event      [description]
-     * @param  Closure $callback   [description]
-     * @param  String  $identifier [description]
+     * @param  String  $event      
+     * @param  Closure $callback   
+     * @param  String  $identifier 
      * @return void
      */
     public function on($event,$callback,$identifier=null){
@@ -438,8 +433,8 @@ class App implements \ArrayAccess {
 
     /**
      * Trigger event.
-     * @param  String $event  [description]
-     * @param  Array  $params [description]
+     * @param  String $event  
+     * @param  Array  $params 
      * @return Boolean
      */
     public function trigger($event,$params=array()){
@@ -500,6 +495,58 @@ class App implements \ArrayAccess {
      }
       
       return $output;
+    }
+
+    /**
+     * Start block
+     * @param  String $name
+     * @return Null      
+     */
+    public function start($name) {
+      
+      if(!isset($this->blocks[$name])){
+        $this->blocks[$name] = array();
+      }
+
+      ob_start();
+    }
+
+    /**
+     * End block
+     * @param  String $name
+     * @return Null      
+     */
+    public function end($name) {
+      
+      $out = ob_get_clean();
+
+      if(isset($this->blocks[$name])){
+        $this->blocks[$name][] = $out;
+      }
+
+    }
+
+  /**
+   * Get block content
+   * @param  String $name    
+   * @param  array  $options 
+   * @return String          
+   */
+    public function block($name, $options=array()) {
+      
+      if(!isset($this->blocks[$name])) return null;
+
+      $options = array_merge(array(
+        "print" => true
+      ), $options);
+
+      $block = implode("\n", $this->blocks[$name]);
+
+      if($options["print"]){
+        echo $block;
+      }
+
+      return $block;
     }
 
     /**
@@ -575,24 +622,53 @@ class App implements \ArrayAccess {
 
     /**
      * Bind Class to routes
-     * @param  String $class [description]
+     * @param  String $class 
      * @return void
      */
-    public function bindClass($class) {
+    public function bindClass($class, $alias = false) {
 
-      $self = $this;
+      $self  = $this;
+      $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $class)), "\\");
 
-      $this->bind('/'.strtolower($class).'/*', function() use($self, $class) {
+      $this->bind('/'.$clean.'/*', function() use($self, $class, $clean) {
           
-          $parts      = explode("/", $self["route"]);
-          $action     = $parts[2];
-          $params     = count($parts)>3 ? array_slice($parts, 3):array();
+          $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+          $action     = isset($parts[0]) ? $parts[0]:"index";
+          $params     = count($parts)>1 ? array_slice($parts, 1):array();
 
           return $self->invoke($class,$action, $params);
       });
 
-      $this->bind('/'.strtolower($class), function() use($self, $class) {
+      $this->bind('/'.$clean, function() use($self, $class) {
           
+          return $self->invoke($class,'index', array());
+      });
+    }
+
+    /**
+     * Bind namespace to routes
+     * @param  String $namespace 
+     * @return void
+     */
+    public function bindNamespace($namespace, $alias) {
+
+      $self  = $this;
+      $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $namespace)), "\\");
+
+      $this->bind('/'.$clean.'/*', function() use($self, $namespace, $clean) {
+          
+          $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+          $class      = $namespace.'\\'.$parts[0];
+          $action     = isset($parts[1]) ? $parts[1]:"index";
+          $params     = count($parts)>2 ? array_slice($parts, 2):array();
+
+          return $self->invoke($class,$action, $params);
+      });
+
+      $this->bind('/'.strtolower($namespace), function() use($self, $namespace) {
+
+          $class = $namespace."\\".array_pop(explode('\\', $namespace));
+
           return $self->invoke($class,'index', array());
       });
     }
@@ -608,7 +684,7 @@ class App implements \ArrayAccess {
 
       $controller = new $class($this);
 
-      return call_user_func_array(array($controller,$action), $params);
+      return method_exists($controller, $action) ? call_user_func_array(array($controller,$action), $params):false;
     }
 
   	/**
@@ -732,7 +808,7 @@ class App implements \ArrayAccess {
 
     /**
      * Request helper function
-     * @param  String $type [description]
+     * @param  String $type 
      * @return Boolean
      */
     public function req_is($type){
@@ -859,13 +935,19 @@ class App implements \ArrayAccess {
 
 // Helpers
 
-class Helper {
+class AppAware {
 
   public $app;
 
   public function __construct($app) {
     $this->app = $app;
-  }
+  }  
+
+}
+
+
+class Helper extends AppAware {
+
 
 } // End helper
 
@@ -923,8 +1005,8 @@ class Assets extends Helper {
 
     /**
      * [style description]
-     * @param  String $name [description]
-     * @return String       [description]
+     * @param  String $name 
+     * @return String       
      */
     public function style($name) {
       
@@ -934,8 +1016,8 @@ class Assets extends Helper {
 
     /**
      * [script description]
-     * @param  String $name [description]
-     * @return String      [description]
+     * @param  String $name 
+     * @return String      
      */
     public function script($name){
       
@@ -946,41 +1028,33 @@ class Assets extends Helper {
 
     /**
      * [register description]
-     * @param  String $name   [description]
-     * @param  Array $assets [description]
+     * @param  String $name   
+     * @param  Array $assets 
      * @return void
      */
-    public function register($name, $assets, $cache=false) {
+    public function register($name, $assets) {
         
         $self = $this;
 
-        $this->app->bind("/assets/{$name}.js", function() use($self, $name, $assets, $cache){
+        $this->app->bind("/assets/{$name}.js", function() use($self, $name, $assets){
           $self->app->response["gzip"] = true;
           $self->app->response["mime"] = "js";
-          return $self->assets($assets, "js", $cache);
+          return $self->assets($assets, "js");
         });
 
-        $this->app->bind("/assets/{$name}.css", function() use($self, $name, $assets, $cache){
+        $this->app->bind("/assets/{$name}.css", function() use($self, $name, $assets){
           $self->app->response["gzip"] = true;
           $self->app->response["mime"] = "css";
-          return $self->assets($assets, "css", $cache);
+          return $self->assets($assets, "css");
         });
     }
 
     /**
      * [assets description]
-     * @param  Array $assets [description]
+     * @param  Array $assets 
      * @return String         js or css
-     * @return Integer        cache time
      */
-    public function assets($assets, $type, $cache = false) {
-
-      $app = $this->app;
-
-      if($cache && $app("cache")->read("$assets.$type", false)) {
-        return $app("cache")->read("$assets.$type");
-      }
-
+    public function assets($assets, $type) {
 
       $self = $this;
 
@@ -1049,14 +1123,7 @@ class Assets extends Helper {
         $output[] = $content;
       }
 
-
-      $output = implode("", $output);
-
-      if($cache){
-        $app("cache")->write("$assets.$type", $output, $cache);
-      }
-
-      return $output;
+      return implode("", $output);
     }
 
 }
