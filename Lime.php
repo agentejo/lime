@@ -36,6 +36,7 @@ class App implements \ArrayAccess {
   protected $paths    = array();
   protected $events   = array();
 
+  protected $exit     = false;
 
   public $response    = array(
      "body"    => "",
@@ -226,7 +227,7 @@ class App implements \ArrayAccess {
      * @param  Closure $callable 
      * @return Object            
      */
-    public function share($name, Closure $callable) {
+    public function service($name, $callable) {
         $this[$name] = function ($c) use ($callable) {
             static $object;
 
@@ -248,6 +249,10 @@ class App implements \ArrayAccess {
       $self = $this;
 
       register_shutdown_function(function() use($self){
+
+        if($self->isExit()){
+          return;
+        }
 
         $error = error_get_last();
 
@@ -301,6 +306,22 @@ class App implements \ArrayAccess {
     }
 
     /**
+     * stop application (exit)
+     */
+    public function stop(){
+      $this->exit = true;
+      exit;
+    }
+
+    /**
+     * Is application stopped?
+     * @return boolean
+     */
+    public function isExit() {
+      return $this->exit;
+    }
+
+    /**
      * Returns link based on the base url of the app
      * @param  String $path e.g. /js/myscript.js
      * @return String       Link
@@ -309,6 +330,8 @@ class App implements \ArrayAccess {
     
         return $this->registry["base_url"].'/'.ltrim($path, '/');
     }
+
+    public function base($path) { echo $this->baseUrl($path); }
 
     /**
      * Returns link based on the route url of the app
@@ -319,6 +342,8 @@ class App implements \ArrayAccess {
 
         return $this->registry["base_route"].'/'.ltrim($path, '/');
     }
+
+    public function route($path) { echo $this->routeUrl($path); }
 
     /**
      * Redirect to path.
@@ -335,7 +360,7 @@ class App implements \ArrayAccess {
         }
 
         header('Location: '.$path);
-        exit;
+        $this->stop();
     }
 
     /**
@@ -572,8 +597,8 @@ class App implements \ArrayAccess {
      * @return Misc          
      */
     public function param($index=null, $default = null, $source = null) {
-
-      return fetch_from_array(($source ? $source : $_REQUEST), $index, $default);
+      $src = $source ? $source : $_REQUEST;
+      return fetch_from_array($src, $index, $default);
     }
 
     /**
@@ -1024,6 +1049,11 @@ class Assets extends Helper {
       $src = $this->app->routeUrl("/assets/{$name}.js");
  
       return '<script src="'.$src.'" type="text/javascript"></script>';
+    }
+
+    public function style_and_script($name) {
+        echo $this->script($name);
+        echo $this->style($name);
     }
 
     /**
