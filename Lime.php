@@ -166,16 +166,17 @@ class App implements \ArrayAccess {
       'xml'   => 'text/xml'
   );
 
-	/**
-	 * Constructor
-	 * @param Array $settings initial registry settings
-	 */
-	public function __construct ($settings = array()) {
+  /**
+   * Constructor
+   * @param Array $settings initial registry settings
+   */
+  public function __construct ($settings = array()) {
         
         $self = $this;
 
         $this->registry = array_merge(array(
           'debug'     => true,
+          'sec-key'   => 'xxxxx-SiteSecKeyPleaseChangeMe-xxxxx',
           'route'     => isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] : "/",
           'charset'   => 'UTF-8',
           'base_url'  => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
@@ -184,10 +185,6 @@ class App implements \ArrayAccess {
 
         if(!isset($this["name"])){
           $this["name"] = uniqid();
-        }
-
-        if(!isset($this["sec-key"])){
-          $this["sec-key"] = 'xxxxx-SiteSecKeyPleaseChangeMe-xxxxx';
         }
 
         self::$apps[$this["name"]] = $this;
@@ -331,7 +328,12 @@ class App implements \ArrayAccess {
         return $this->registry["base_url"].'/'.ltrim($path, '/');
     }
 
-    public function base($path) { echo $this->baseUrl($path); }
+    public function base($path) { 
+      
+      $args = func_get_args();
+
+      echo (count($args)==1) ? $this->baseUrl($args[0]) : $this->baseUrl(call_user_func_array('sprintf', $args));
+    }
 
     /**
      * Returns link based on the route url of the app
@@ -343,7 +345,13 @@ class App implements \ArrayAccess {
         return $this->registry["base_route"].'/'.ltrim($path, '/');
     }
 
-    public function route($path) { echo $this->routeUrl($path); }
+    public function route() { 
+
+      $args = func_get_args();
+
+      echo (count($args)==1) ? $this->routeUrl($args[0]) : $this->routeUrl(call_user_func_array('sprintf', $args));
+
+    }
 
     /**
      * Redirect to path.
@@ -369,7 +377,7 @@ class App implements \ArrayAccess {
      * @param Misc $value  Value
      */
     public function set($key, $value) {
-    	$this->registry[$key] = $value;
+      $this->registry[$key] = $value;
     }
 
     /**
@@ -379,7 +387,7 @@ class App implements \ArrayAccess {
      * @return Misc          
      */
     public function retrieve($key, $default=null) {
-    	return isset($this->registry[$key]) ? $this->registry[$key]:$default;
+      return isset($this->registry[$key]) ? $this->registry[$key]:$default;
     }
 
     /**
@@ -629,8 +637,8 @@ class App implements \ArrayAccess {
      * @return void
      */
     public function get($path, $callback, $condition = true){
-    	if(!$this->req_is("get")) return;
-    	$this->bind($path, $callback, $condition);
+      if(!$this->req_is("get")) return;
+      $this->bind($path, $callback, $condition);
     }
 
     /**
@@ -641,8 +649,8 @@ class App implements \ArrayAccess {
      * @return void          
      */
     public function post($path, $callback, $condition = true){
-    	if(!$this->req_is("post")) return;
-    	$this->bind($path, $callback, $condition);
+      if(!$this->req_is("post")) return;
+      $this->bind($path, $callback, $condition);
     }
 
     /**
@@ -712,30 +720,30 @@ class App implements \ArrayAccess {
       return method_exists($controller, $action) ? call_user_func_array(array($controller,$action), $params):false;
     }
 
-  	/**
-  	 * Bind request to route
+    /**
+     * Bind request to route
      * @param  String  $path
      * @param  Closure  $callback
      * @param  Boolean $condition
      * @return void
-  	 */
-  	public function bind($path, $callback, $condition = true) {
-  		
+     */
+    public function bind($path, $callback, $condition = true) {
+      
       if (!$condition) return;
 
-  		if (!isset($this->routes[$path])) {
-  			$this->routes[$path] = array();
-  		}
-  		
-  		$this->routes[$path] = $callback;
-  	}
+      if (!isset($this->routes[$path])) {
+        $this->routes[$path] = array();
+      }
+      
+      $this->routes[$path] = $callback;
+    }
 
-  	/**
-  	 * Dispatch route
-  	 * @param  String $path
-  	 * @return Misc
-  	 */
-  	public function dispatch($path) {
+    /**
+     * Dispatch route
+     * @param  String $path
+     * @return Misc
+     */
+    public function dispatch($path) {
                
           $found  = false;
           $params = array();
@@ -805,14 +813,14 @@ class App implements \ArrayAccess {
           }
           
           return $found;
-  	}
+    }
 
-  	/**
-  	 * Render dispatched route
-  	 * @param  [type] $route
-  	 * @param  array  $params
-  	 * @return String
-  	 */
+    /**
+     * Render dispatched route
+     * @param  [type] $route
+     * @param  array  $params
+     * @return String
+     */
       protected function render_route($route, $params = array()) {
           
           $output = false;
@@ -823,9 +831,9 @@ class App implements \ArrayAccess {
                   $ret = call_user_func($this->routes[$route], $params);
               }
               
-        			if( !is_null($ret) ){
-        				return $ret;
-        			}
+              if( !is_null($ret) ){
+                return $ret;
+              }
           }
           
           return $output;
@@ -846,10 +854,10 @@ class App implements \ArrayAccess {
           case 'mobile':
             
             $mobileDevices = array(
-    		        "midp","240x320","blackberry","netfront","nokia","panasonic","portalmmm","sharp","sie-","sonyericsson",
-    		        "symbian","windows ce","benq","mda","mot-","opera mini","philips","pocket pc","sagem","samsung",
-    		        "sda","sgh-","vodafone","xda","iphone", "ipod","android"
-    		    );
+                "midp","240x320","blackberry","netfront","nokia","panasonic","portalmmm","sharp","sie-","sonyericsson",
+                "symbian","windows ce","benq","mda","mot-","opera mini","philips","pocket pc","sagem","samsung",
+                "sda","sgh-","vodafone","xda","iphone", "ipod","android"
+            );
 
             return preg_match('/(' . implode('|', $mobileDevices). ')/i',strtolower($_SERVER['HTTP_USER_AGENT']));
             break;
@@ -925,9 +933,48 @@ class App implements \ArrayAccess {
         return rtrim($url,'/');
     }
 
-	// Array Access implementation
+    /**
+     * Create Hash
+     * @return String
+     */
+    public function hash($text) {
+        $rc4 = function($data, $pwd, $base64encoded = false) {
 
-	public function offsetSet($key, $value) {
+            $key[] = '';
+            $box[] = '';
+            $cipher = '';
+
+            $pwd_length = strlen($pwd);
+            $data_length = strlen($data);
+
+            for ($i = 0; $i < 256; $i++) {
+                $key[$i] = ord($pwd[$i % $pwd_length]);
+                $box[$i] = $i;
+            }
+            for ($j = $i = 0; $i < 256; $i++) {
+                $j = ($j + $box[$i] + $key[$i]) % 256;
+                $tmp = $box[$i];
+                $box[$i] = $box[$j];
+                $box[$j] = $tmp;
+            }
+            for ($a = $j = $i = 0; $i < $data_length; $i++) {
+                $a = ($a + 1) % 256;
+                $j = ($j + $box[$a]) % 256;
+                $tmp = $box[$a];
+                $box[$a] = $box[$j];
+                $box[$j] = $tmp;
+                $k = $box[(($box[$a] + $box[$j]) % 256)];
+                $cipher .= chr(ord($data[$i]) ^ $k);
+            }
+            return $base64encoded ? base64_encode($cipher):$cipher;
+        };
+
+        return md5($rc4($text, $this["sec-key"], true));
+    }
+
+  // Array Access implementation
+
+  public function offsetSet($key, $value) {
         $this->registry[$key] = $value;
     }
 
@@ -1116,9 +1163,11 @@ class Assets extends Helper {
 
       foreach ($assets as $asset) {
 
+        $ext_parts = explode(".", $asset['file']);
+
         $asset = array_merge(array(
           "filters"   => array(),
-          "ext"   => strtolower(array_pop(explode(".", $asset['file'])))
+          "ext"   => strtolower(array_pop($ext_parts))
         ), $asset);
 
         $file    = $asset['file'];
