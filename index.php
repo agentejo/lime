@@ -1,6 +1,6 @@
 <?php
     
-    require_once("Lime.php");
+    require_once("src/Lime/App.php");
 
     $app = new Lime\App();
 
