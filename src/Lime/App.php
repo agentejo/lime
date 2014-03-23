@@ -3,7 +3,7 @@
 /*
  * Lime.
  *
- * Copyright (c) 2013 Artur Heinze
+ * Copyright (c) 2013-2014 Artur Heinze
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -207,6 +207,17 @@ class App implements \ArrayAccess {
                 }
             }
         });
+
+
+        // check for php://input and merge with $_REQUEST
+        if(
+            (isset($_SERVER["CONTENT_TYPE"]) && stripos($_SERVER["CONTENT_TYPE"],'application/json')!==false) ||
+            (isset($_SERVER["HTTP_CONTENT_TYPE"]) && stripos($_SERVER["HTTP_CONTENT_TYPE"],'application/json')!==false) // PHP build in Webserver !?
+        ) {
+            if($json = json_decode(@file_get_contents('php://input'), true)) {
+                $_REQUEST = array_merge($_REQUEST, $json);
+            }
+        }
     }
 
     /**
@@ -237,55 +248,15 @@ class App implements \ArrayAccess {
     }
 
     /**
-    * Run Application
-    * @param  String $route Route to parse
-    * @return void
-    */
-    public function run() {
-
-        $self = $this;
-
-        register_shutdown_function(function() use($self){
-
-            if($self->isExit()){
-                return;
-            }
-
-            $error = error_get_last();
-
-            if ($error && in_array($error['type'], array(E_ERROR,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR))){
-
-                ob_end_clean();
-
-                $self->response->status = "500";
-                $self->response->body   = $self["debug"] ? json_encode($error):'Internal Error.';
-
-            } elseif (!$self->response->body) {
-                $self->response->status = "404";
-                $self->response->body   = "Path not found.";
-            }
-
-            $self->trigger("after");
-
-            echo $self->response->flush();
-
-            $self->trigger("shutdown");
-        });
-
-        $this->response = new Response();
-
-        $this->trigger("before");
-
-        $this->response->body = $this->dispatch($this["route"]);
-
-        if ($this->response->gzip && !ob_start("ob_gzhandler")) ob_start();
-    }
-
-    /**
     * stop application (exit)
     */
-    public function stop(){
+    public function stop($data = false){
         $this->exit = true;
+
+        if($data!==false) {
+            echo $data;
+        }
+
         exit;
     }
 
@@ -304,7 +275,7 @@ class App implements \ArrayAccess {
     */
     public function baseUrl($path) {
 
-        return $this->registry["base_url"].'/'.ltrim($path, '/');
+        return strpos($path, ':')===false ? $this->registry["base_url"].'/'.ltrim($path, '/') : $this->pathToUrl($path);
     }
 
     public function base($path) {
@@ -410,7 +381,7 @@ class App implements \ArrayAccess {
         case 1:
             $file  = $args[0];
 
-            if(file_exists($file)) {
+            if($this->isAbsolutePath($file) && file_exists($file)) {
                 return $file;
             }
 
@@ -493,19 +464,14 @@ class App implements \ArrayAccess {
     * Bind an event to closure
     * @param  String  $event
     * @param  Closure $callback
-    * @param  String  $identifier
+    * @param  Integer $priority
     * @return void
     */
-    public function on($event,$callback,$identifier=null){
+    public function on($event,$callback, $priority = 0){
 
         if(!isset($this->events[$event])) $this->events[$event] = array();
 
-        if(!is_null($identifier)){
-            $this->events[$event][$identifier] = $callback;
-        }else{
-            $this->events[$event][] = $callback;
-        }
-
+        $this->events[$event][] = array("fn" => $callback, "prio" => $priority);
     }
 
     /**
@@ -520,10 +486,26 @@ class App implements \ArrayAccess {
             return $this;
         }
 
-        foreach($this->events[$event] as $id => $action){
-            if(is_callable($action)){
-                call_user_func_array($action, $params);
+        if(!count($this->events[$event])){
+            return $this;
+        }
+
+        $queue = new \SplPriorityQueue();
+
+        foreach($this->events[$event] as $index => $action){
+            $queue->insert($index, $action["prio"]);
+        }
+
+        $queue->top();
+
+        while($queue->valid()){
+            $index = $queue->current();
+            if(is_callable($this->events[$event][$index]["fn"])){
+                if(call_user_func_array($this->events[$event][$index]["fn"], $params) === false) {
+                    break; // stop Propagation
+                }
             }
+            $queue->next();
         }
 
         return $this;
@@ -650,6 +632,7 @@ class App implements \ArrayAccess {
     * @return Misc
     */
     public function param($index=null, $default = null, $source = null) {
+
         $src = $source ? $source : $_REQUEST;
         return fetch_from_array($src, $index, $default);
     }
@@ -659,9 +642,17 @@ class App implements \ArrayAccess {
     * @param  String $href
     * @return String
     */
-    public function style($href) {
+    public function style($href, $version=false) {
 
-        return '<link href="'.$href.'" type="text/css" rel="stylesheet" />';
+        $list = array();
+
+        foreach((array)$href as $style) {
+
+            $ispath = strpos($style, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $style);
+            $list[] = '<link href="'.($ispath ? $this->pathToUrl($style):$style).($version ? "?ver={$version}":"").'" type="text/css" rel="stylesheet">';
+        }
+
+        return implode("\n", $list);
     }
 
     /**
@@ -669,20 +660,34 @@ class App implements \ArrayAccess {
     * @param  String $src
     * @return String
     */
-    public function script($src){
+    public function script($src, $version=false){
 
-        return '<script src="'.$src.'" type="text/javascript"></script>';
+        $list = array();
+
+        foreach((array)$src as $script) {
+            $ispath = strpos($script, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $script);
+            $list[] = '<script src="'.($ispath ? $this->pathToUrl($script):$script).($version ? "?ver={$version}":"").'" type="text/javascript"></script>';
+        }
+
+        return implode("\n", $list);
     }
 
-    public function script_or_style($src){
+    public function assets($src, $version=false){
 
-        if(@substr($src, -3) == ".js") {
-            return $this->script($src);
+        $list = array();
+
+        foreach((array)$src as $script) {
+
+            if(@substr($script, -3) == ".js") {
+                $list[] = $this->script($script, $version);
+            }
+
+            if(@substr($script, -4) == ".css") {
+                $list[] = $this->style($script, $version);
+            }
         }
 
-        if(@substr($src, -4) == ".css") {
-            return $this->style($src);
-        }
+        return implode("\n", $list);
     }
 
     /**
@@ -763,20 +768,6 @@ class App implements \ArrayAccess {
     }
 
     /**
-    * Invoke Class as controller
-    * @param  String $class
-    * @param  String $action
-    * @param  Array  $params
-    * @return Misc
-    */
-    public function invoke($class, $action="index", $params=array()) {
-
-        $controller = new $class($this);
-
-        return method_exists($controller, $action) ? call_user_func_array(array($controller,$action), $params):false;
-    }
-
-    /**
     * Bind request to route
     * @param  String  $path
     * @param  Closure  $callback
@@ -792,6 +783,51 @@ class App implements \ArrayAccess {
         }
 
         $this->routes[$path] = $callback;
+    }
+
+    /**
+    * Run Application
+    * @param  String $route Route to parse
+    * @return void
+    */
+    public function run() {
+
+        $self = $this;
+
+        register_shutdown_function(function() use($self){
+
+            if($self->isExit()){
+                return;
+            }
+
+            $error = error_get_last();
+
+            if ($error && in_array($error['type'], array(E_ERROR,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR))){
+
+                ob_end_clean();
+
+                $self->response->status = "500";
+                $self->response->body   = $self["debug"] ? json_encode($error):'Internal Error.';
+
+            } elseif (!$self->response->body) {
+                $self->response->status = "404";
+                $self->response->body   = "Path not found.";
+            }
+
+            $self->trigger("after");
+
+            echo $self->response->flush();
+
+            $self->trigger("shutdown");
+        });
+
+        $this->response = new Response();
+
+        $this->trigger("before");
+
+        $this->response->body = $this->dispatch($this["route"]);
+
+        if ($this->response->gzip && !ob_start("ob_gzhandler")) ob_start();
     }
 
     /**
@@ -827,7 +863,7 @@ class App implements \ArrayAccess {
                     /* e.g. /admin/*  */
                     if(strpos($route, '*') !== false){
 
-                        $pattern = '#'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
+                        $pattern = '#^'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
 
                         if(preg_match($pattern, $path, $matches)){
 
@@ -848,7 +884,7 @@ class App implements \ArrayAccess {
                             $matched = true;
 
                             foreach($parts_r as $index => $part){
-                                if(substr($part,0,1)==':') {
+                                if(':' === substr($part,0,1)) {
                                     $params[substr($part,1)] = $parts_p[$index];
                                     continue;
                                 }
@@ -877,23 +913,38 @@ class App implements \ArrayAccess {
     * @param  array  $params
     * @return String
     */
-        protected function render_route($route, $params = array()) {
+    protected function render_route($route, $params = array()) {
 
-            $output = false;
+        $output = false;
 
-            if(isset($this->routes[$route])) {
+        if(isset($this->routes[$route])) {
 
-                if(is_callable($this->routes[$route])){
-                    $ret = call_user_func($this->routes[$route], $params);
-                }
-
-                    if( !is_null($ret) ){
-                        return $ret;
-                    }
+            if(is_callable($this->routes[$route])){
+                $ret = call_user_func($this->routes[$route], $params);
             }
 
-            return $output;
+            if( !is_null($ret) ){
+                return $ret;
+            }
         }
+
+        return $output;
+    }
+
+
+    /**
+    * Invoke Class as controller
+    * @param  String $class
+    * @param  String $action
+    * @param  Array  $params
+    * @return Misc
+    */
+    public function invoke($class, $action="index", $params=array()) {
+
+        $controller = new $class($this);
+
+        return method_exists($controller, $action) ? call_user_func_array(array($controller,$action), $params):false;
+    }
 
     /**
     * Request helper function
@@ -904,7 +955,11 @@ class App implements \ArrayAccess {
 
         switch(strtolower($type)){
             case 'ajax':
-            return (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'));
+            return (
+                (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'))       ||
+                (isset($_SERVER["CONTENT_TYPE"]) && stripos($_SERVER["CONTENT_TYPE"],'application/json')!==false)           ||
+                (isset($_SERVER["HTTP_CONTENT_TYPE"]) && stripos($_SERVER["HTTP_CONTENT_TYPE"],'application/json')!==false)
+            );
             break;
 
             case 'mobile':
@@ -967,7 +1022,10 @@ class App implements \ArrayAccess {
     * Get client language
     * @return String
     */
-    public function getClientLang() {
+    public function getClientLang($default="en") {
+        if (!isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+            return $default;
+        }
         return strtolower(substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2));
     }
 
@@ -999,7 +1057,7 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [encode description]
+     * RC4 encryption
      * @param  [type]  $data          [description]
      * @param  [type]  $pwd           [description]
      * @param  boolean $base64encoded [description]
@@ -1037,7 +1095,7 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [decode description]
+     * Decode RC4 encrypted text
      * @param  [type] $data [description]
      * @param  [type] $pwd  [description]
      * @return [type]       [description]
@@ -1052,6 +1110,15 @@ class App implements \ArrayAccess {
         }
 
         return $this->helpers[$helper];
+    }
+
+    public function isAbsolutePath($file) {
+
+        if ($file[0] == '/' || $file[0] == '\\' || (strlen($file) > 3 && ctype_alpha($file[0]) && $file[1] == ':' && ($file[2] == '\\' || $file[2] == '/')) || null !== parse_url($file, PHP_URL_SCHEME)) {
+            return true;
+        }
+
+        return false;
     }
 
     // accces to services
@@ -1114,7 +1181,6 @@ class Response {
 
     }
 
-
     public function flush() {
 
         if (!headers_sent($filename, $linenum)) {
@@ -1136,7 +1202,7 @@ class Response {
                 header($h);
             }
 
-            echo $this->body;
+            echo is_array($this->body) ? json_encode($this->body) : $this->body;
         }
     }
 }
@@ -1179,14 +1245,23 @@ class Helper extends AppAware { }
 
 class Session extends Helper {
 
+    protected $initialized = false;
+    public $name;
+
     public function init($sessionname=null){
 
-        if(strlen(session_id())) {
-            session_destroy();
+        if($this->initialized) return;
+
+        if(!strlen(session_id())) {
+            $this->name = $sessionname ? $sessionname : $this->app["session.name"];
+
+            session_name($this->name);
+            session_start();
+        } else {
+            $this->name = session_name();
         }
 
-        session_name($sessionname ? $sessionname : $this->app["session.name"]);
-        session_start();
+        $this->initialized = true;
     }
 
     public function write($key, $value){
