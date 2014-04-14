@@ -141,6 +141,8 @@ Just bind a class:
     $app->service("db", function(){
         
         $obj = new PDO(...);
+        
+        return $obj;
 
     });
 
