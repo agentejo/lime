@@ -202,6 +202,21 @@ $app["db"]->query(...);
 
 ## Events
 
+
+
+
+
+```php
+
+// register callback
+$app->on("customevent", function(){
+    // code to execute on event
+}, $priority = 0);
+
+// trigger custom events
+$app->trigger("customevent", $params=array());
+```
+
 You can utilize three system events: before, after and shutdown
 
 ```php
@@ -219,6 +234,9 @@ $app->on("after", function() use($app){
     }
 });
 ```
+
+
+
 
 ## Helpers
 
