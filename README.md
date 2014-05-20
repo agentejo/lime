@@ -203,9 +203,6 @@ $app["db"]->query(...);
 ## Events
 
 
-
-
-
 ```php
 
 // register callback
