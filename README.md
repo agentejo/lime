@@ -11,7 +11,7 @@ $app->bind("/", function() {
 });
 
 $app->run();
-``
+```
 
 Just include one file (~ 35KB) and you're ready to go.
 
@@ -33,7 +33,6 @@ $app->bind("/", function() {
     return "This was a GET or POST request...";
 });
 ```
-
 
 Routes are matched in the order they are defined. The first route that matches the request is invoked.
 
@@ -64,6 +63,12 @@ $app->get("/foo", function() {
 }, strpos($_SERVER['HTTP_USER_AGENT'], "Safari")!==false);
 ```
 
+## Create Urls
+
+```php
+$route = $app->routeUrl('/my/route');
+$url   = $app->baseUrl('/assets/script.js');
+```
 
 ## Templates
 
@@ -99,6 +104,8 @@ views/layout.php:
         <title><?php echo $title;?></title>
 </head>
 <body>
+        <a href="<?php echo $this->routeUrl('/');?>">Home</a>
+        <hr>
         <?php echo $content_for_layout;?>
 </body>
 </html>
@@ -114,31 +121,31 @@ class Pages {
     protected $app;
 
     public function __construct($app){
-            $this->app = $app;
+        $this->app = $app;
     }
 
     /*
-            accessible via
-            /pages or /pages/index
+        accessible via
+        /pages or /pages/index
     */
     public function index() {
-            return $app->render("pages/index.php");
+        return $app->render("pages/index.php");
     }
 
     /*
-            accessible via
-            /pages/contact
+        accessible via
+        /pages/contact
     */
     public function contact() {
-            return $app->render("pages/contact.php");
+        return $app->render("pages/contact.php");
     }
 
     /*
-            accessible via
-            /pages/welcome/foo
+        accessible via
+        /pages/welcome/foo
     */
     public function welcome($name) {
-            return $app->render("pages/welcome.php", array("name"=>$name));
+        return $app->render("pages/welcome.php", array("name"=>$name));
     }
 }
 
@@ -158,6 +165,24 @@ Path access helper with <code>/</code>
 
 ```php
 $value = $app["config.mykey/test"]; // will return 123
+```
+
+## Paths
+
+Register paths for quicker access
+
+```php
+$app->path('views', __DIR__.'/views');
+
+$view = $app->path('views:detail.php');
+$view = $app->render('views:detail.php');
+```
+
+Gets url to file
+
+```php
+$url  = $app->pathToUrl('folder/file.php');
+$url  = $app->pathToUrl('view:file.php');
 ```
 
 ## Dependency injection
