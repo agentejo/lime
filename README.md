@@ -129,7 +129,7 @@ class Pages {
         /pages or /pages/index
     */
     public function index() {
-        return $app->render("pages/index.php");
+        return $this->app->render("pages/index.php");
     }
 
     /*
@@ -137,7 +137,7 @@ class Pages {
         /pages/contact
     */
     public function contact() {
-        return $app->render("pages/contact.php");
+        return $this->app->render("pages/contact.php");
     }
 
     /*
@@ -145,7 +145,7 @@ class Pages {
         /pages/welcome/foo
     */
     public function welcome($name) {
-        return $app->render("pages/welcome.php", array("name"=>$name));
+        return $this->app->render("pages/welcome.php", array("name"=>$name));
     }
 }
 

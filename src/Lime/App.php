@@ -186,7 +186,7 @@ class App implements \ArrayAccess {
         }
 
         if(!isset($this["session.name"])){
-            $this["session.name"] = $this["name"];
+            $this["session.name"] = $this["app.name"];
         }
 
         if (!isset($this["docs_root"])) {
