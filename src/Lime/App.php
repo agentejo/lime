@@ -711,15 +711,15 @@ class App implements \ArrayAccess {
     public function bindClass($class, $alias = false) {
 
         $self  = $this;
-        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $class)), "\\");
+        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $class)), "/");
 
         $this->bind('/'.$clean.'/*', function() use($self, $class, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
-            $action     = isset($parts[0]) ? $parts[0]:"index";
-            $params     = count($parts)>1 ? array_slice($parts, 1):array();
+            $parts      = explode('/', trim(str_replace($clean, "", $self["route"]), '/'));
+            $action     = isset($parts[0]) ? $parts[0] : "index";
+            $params     = count($parts) > 1 ? array_slice($parts, 1) : array();
 
-            return $self->invoke($class,$action, $params);
+            return $self->invoke($class, $action, $params);
         });
 
         $this->bind('/'.$clean, function() use($self, $class) {
@@ -736,14 +736,14 @@ class App implements \ArrayAccess {
     public function bindNamespace($namespace, $alias) {
 
         $self  = $this;
-        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $namespace)), "\\");
+        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $namespace)), "/");
 
         $this->bind('/'.$clean.'/*', function() use($self, $namespace, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+            $parts      = explode('/', trim(str_replace($clean, "", $self["route"]),'/'));
             $class      = $namespace.'\\'.$parts[0];
-            $action     = isset($parts[1]) ? $parts[1]:"index";
-            $params     = count($parts)>2 ? array_slice($parts, 2):array();
+            $action     = isset($parts[1]) ? $parts[1] : "index";
+            $params     = count($parts) > 2 ? array_slice($parts, 2):array();
 
             return $self->invoke($class,$action, $params);
         });
@@ -828,6 +828,7 @@ class App implements \ArrayAccess {
 
             $found  = false;
             $params = array();
+            $path   = $path == '/' ? $path : rtrim($path, '/');
 
             if (isset($this->routes[$path])) {
 
