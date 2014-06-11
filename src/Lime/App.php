@@ -826,75 +826,75 @@ class App implements \ArrayAccess {
     */
     public function dispatch($path) {
 
-            $found  = false;
-            $params = array();
-            $path   = $path == '/' ? $path : rtrim($path, '/');
+        $found  = false;
+        $params = array();
+        $path   = $path == '/' ? $path : rtrim($path, '/');
 
-            if (isset($this->routes[$path])) {
+        if (isset($this->routes[$path])) {
 
-                $found = $this->render_route($path, $params);
+            $found = $this->render_route($path, $params);
 
-            } else {
+        } else {
 
-                foreach ($this->routes as $route => $callback) {
+            foreach ($this->routes as $route => $callback) {
 
-                    $params = array();
+                $params = array();
 
-                    /* e.g. #\.html$#  */
-                    if(substr($route,0,1)=='#' && substr($route,-1)=='#'){
+                /* e.g. #\.html$#  */
+                if(substr($route,0,1)=='#' && substr($route,-1)=='#'){
 
-                        if(preg_match($route,$path, $matches)){
-                            $params[':captures'] = array_slice($matches, 1);
-                            $found = $this->render_route($route, $params);
-                            break;
-                        }
+                    if(preg_match($route,$path, $matches)){
+                        $params[':captures'] = array_slice($matches, 1);
+                        $found = $this->render_route($route, $params);
+                        break;
                     }
+                }
 
-                    /* e.g. /admin/*  */
-                    if(strpos($route, '*') !== false){
+                /* e.g. /admin/*  */
+                if(strpos($route, '*') !== false){
 
-                        $pattern = '#^'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
+                    $pattern = '#^'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
 
-                        if(preg_match($pattern, $path, $matches)){
+                    if(preg_match($pattern, $path, $matches)){
 
-                            $params[':splat'] = array_slice($matches, 1);
-                            $found = $this->render_route($route, $params);
-                            break;
-                        }
+                        $params[':splat'] = array_slice($matches, 1);
+                        $found = $this->render_route($route, $params);
+                        break;
                     }
+                }
 
-                    /* e.g. /admin/:id  */
-                    if(strpos($route, ':') !== false){
+                /* e.g. /admin/:id  */
+                if(strpos($route, ':') !== false){
 
-                        $parts_p = explode('/', $path);
-                        $parts_r = explode('/', $route);
+                    $parts_p = explode('/', $path);
+                    $parts_r = explode('/', $route);
 
-                        if(count($parts_p) == count($parts_r)){
+                    if(count($parts_p) == count($parts_r)){
 
-                            $matched = true;
+                        $matched = true;
 
-                            foreach($parts_r as $index => $part){
-                                if(':' === substr($part,0,1)) {
-                                    $params[substr($part,1)] = $parts_p[$index];
-                                    continue;
-                                }
-
-                                if($parts_p[$index] != $parts_r[$index]) {
-                                    $matched = false;
-                                    break;
-                                }
+                        foreach($parts_r as $index => $part){
+                            if(':' === substr($part,0,1)) {
+                                $params[substr($part,1)] = $parts_p[$index];
+                                continue;
                             }
 
-                            if($matched){
-                                $found = $this->render_route($route, $params);;
+                            if($parts_p[$index] != $parts_r[$index]) {
+                                $matched = false;
                                 break;
                             }
+                        }
+
+                        if($matched){
+                            $found = $this->render_route($route, $params);;
+                            break;
                         }
                     }
                 }
             }
+        }
 
-            return $found;
+        return $found;
     }
 
     /**
