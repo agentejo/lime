@@ -221,12 +221,12 @@ You can utilize three system events: before, after and shutdown
 
 $app->on("after", function() use($app){
 
-    switch($app->response["status"]){
+    switch($app->response->status){
         case "404":
-            $app->response["body"] = $app->render("views/404.php");
+            $app->response->body = $app->render("views/404.php");
             break;
         case "500":
-            $app->response["body"] = $app->render("views/500.php");
+            $app->response->body = $app->render("views/500.php");
             break;
     }
 });
