@@ -178,7 +178,8 @@ class App implements \ArrayAccess {
             'helpers'      => array(),
             'base_url'     => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
             'base_route'   => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
-            'docs_root'    => null
+            'docs_root'    => null,
+            'site_url'     => null
         ), $settings);
 
         if(!isset($this["app.name"])){
@@ -189,9 +190,17 @@ class App implements \ArrayAccess {
             $this["session.name"] = $this["app.name"];
         }
 
+        if (!isset($this["site_url"])) {
+            $this["site_url"] = $this->getSiteUrl(false);
+        }
+
         if (!isset($this["docs_root"])) {
             $this["docs_root"] = str_replace(DIRECTORY_SEPARATOR, '/', isset($_SERVER['DOCUMENT_ROOT']) ? (is_link($_SERVER['DOCUMENT_ROOT']) ? readlink($_SERVER['DOCUMENT_ROOT']) : $_SERVER['DOCUMENT_ROOT']) : dirname($_SERVER['SCRIPT_FILENAME']));
         }
+
+        // make sure base + route url doesn't end with a slash;
+        $settings["base_url"]   = rtrim($settings["base_url"], '/');
+        $settings["base_route"] = rtrim($settings["base_route"], '/');
 
         self::$apps[$this["app.name"]] = $this;
 
@@ -279,7 +288,21 @@ class App implements \ArrayAccess {
     */
     public function baseUrl($path) {
 
-        return strpos($path, ':')===false ? $this->registry["base_url"].'/'.ltrim($path, '/') : $this->pathToUrl($path);
+        $url = '';
+
+        if (strpos($path, ':')===false) {
+
+            if ($_SERVER["SERVER_PORT"] != '80') {
+                $url .= $this->registry['site_url'];
+            }
+
+            $url .= $this->registry["base_url"].'/'.ltrim($path, '/');
+
+        } else {
+            $url = $this->pathToUrl($path);
+        }
+
+        return $url;
     }
 
     public function base($path) {
@@ -296,7 +319,15 @@ class App implements \ArrayAccess {
     */
     public function routeUrl($path) {
 
-        return $this->registry["base_route"].'/'.ltrim($path, '/');
+        $url = '';
+
+        if ($_SERVER["SERVER_PORT"] != '80') {
+            $url .= $this->registry['site_url'];
+        }
+
+        $url .= $this->registry["base_route"];
+
+        return $url.'/'.ltrim($path, '/');
     }
 
     public function route() {
@@ -426,6 +457,10 @@ class App implements \ArrayAccess {
             $root = str_replace(DIRECTORY_SEPARATOR, '/', $this['docs_root']);
 
             $url = '/'.ltrim(str_replace($root, '', $file), '/');
+        }
+
+        if ($_SERVER["SERVER_PORT"] != "80") {
+            $url = $this->registry['site_url'].$url;
         }
 
         return $url;
@@ -711,15 +746,15 @@ class App implements \ArrayAccess {
     public function bindClass($class, $alias = false) {
 
         $self  = $this;
-        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $class)), "/");
+        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $class)), "\\");
 
         $this->bind('/'.$clean.'/*', function() use($self, $class, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean, "", $self["route"]), '/'));
-            $action     = isset($parts[0]) ? $parts[0] : "index";
-            $params     = count($parts) > 1 ? array_slice($parts, 1) : array();
+            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+            $action     = isset($parts[0]) ? $parts[0]:"index";
+            $params     = count($parts)>1 ? array_slice($parts, 1):array();
 
-            return $self->invoke($class, $action, $params);
+            return $self->invoke($class,$action, $params);
         });
 
         $this->bind('/'.$clean, function() use($self, $class) {
@@ -736,14 +771,14 @@ class App implements \ArrayAccess {
     public function bindNamespace($namespace, $alias) {
 
         $self  = $this;
-        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $namespace)), "/");
+        $clean = $alias ? $alias : trim(strtolower(str_replace("\\", "/", $namespace)), "\\");
 
         $this->bind('/'.$clean.'/*', function() use($self, $namespace, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean, "", $self["route"]),'/'));
+            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
             $class      = $namespace.'\\'.$parts[0];
-            $action     = isset($parts[1]) ? $parts[1] : "index";
-            $params     = count($parts) > 2 ? array_slice($parts, 2):array();
+            $action     = isset($parts[1]) ? $parts[1]:"index";
+            $params     = count($parts)>2 ? array_slice($parts, 2):array();
 
             return $self->invoke($class,$action, $params);
         });
@@ -826,75 +861,74 @@ class App implements \ArrayAccess {
     */
     public function dispatch($path) {
 
-        $found  = false;
-        $params = array();
-        $path   = $path == '/' ? $path : rtrim($path, '/');
+            $found  = false;
+            $params = array();
 
-        if (isset($this->routes[$path])) {
+            if (isset($this->routes[$path])) {
 
-            $found = $this->render_route($path, $params);
+                $found = $this->render_route($path, $params);
 
-        } else {
+            } else {
 
-            foreach ($this->routes as $route => $callback) {
+                foreach ($this->routes as $route => $callback) {
 
-                $params = array();
+                    $params = array();
 
-                /* e.g. #\.html$#  */
-                if(substr($route,0,1)=='#' && substr($route,-1)=='#'){
+                    /* e.g. #\.html$#  */
+                    if(substr($route,0,1)=='#' && substr($route,-1)=='#'){
 
-                    if(preg_match($route,$path, $matches)){
-                        $params[':captures'] = array_slice($matches, 1);
-                        $found = $this->render_route($route, $params);
-                        break;
+                        if(preg_match($route,$path, $matches)){
+                            $params[':captures'] = array_slice($matches, 1);
+                            $found = $this->render_route($route, $params);
+                            break;
+                        }
                     }
-                }
 
-                /* e.g. /admin/*  */
-                if(strpos($route, '*') !== false){
+                    /* e.g. /admin/*  */
+                    if(strpos($route, '*') !== false){
 
-                    $pattern = '#^'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
+                        $pattern = '#^'.str_replace('\*', '(.*)', preg_quote($route, '#')).'#';
 
-                    if(preg_match($pattern, $path, $matches)){
+                        if(preg_match($pattern, $path, $matches)){
 
-                        $params[':splat'] = array_slice($matches, 1);
-                        $found = $this->render_route($route, $params);
-                        break;
+                            $params[':splat'] = array_slice($matches, 1);
+                            $found = $this->render_route($route, $params);
+                            break;
+                        }
                     }
-                }
 
-                /* e.g. /admin/:id  */
-                if(strpos($route, ':') !== false){
+                    /* e.g. /admin/:id  */
+                    if(strpos($route, ':') !== false){
 
-                    $parts_p = explode('/', $path);
-                    $parts_r = explode('/', $route);
+                        $parts_p = explode('/', $path);
+                        $parts_r = explode('/', $route);
 
-                    if(count($parts_p) == count($parts_r)){
+                        if(count($parts_p) == count($parts_r)){
 
-                        $matched = true;
+                            $matched = true;
 
-                        foreach($parts_r as $index => $part){
-                            if(':' === substr($part,0,1)) {
-                                $params[substr($part,1)] = $parts_p[$index];
-                                continue;
+                            foreach($parts_r as $index => $part){
+                                if(':' === substr($part,0,1)) {
+                                    $params[substr($part,1)] = $parts_p[$index];
+                                    continue;
+                                }
+
+                                if($parts_p[$index] != $parts_r[$index]) {
+                                    $matched = false;
+                                    break;
+                                }
                             }
 
-                            if($parts_p[$index] != $parts_r[$index]) {
-                                $matched = false;
+                            if($matched){
+                                $found = $this->render_route($route, $params);;
                                 break;
                             }
-                        }
-
-                        if($matched){
-                            $found = $this->render_route($route, $params);;
-                            break;
                         }
                     }
                 }
             }
-        }
 
-        return $found;
+            return $found;
     }
 
     /**
@@ -1023,7 +1057,8 @@ class App implements \ArrayAccess {
     * Get site url
     * @return String
     */
-    public function getSiteUrl() {
+    public function getSiteUrl($withpath = false) {
+
         $url = ($this->req_is("ssl") ? 'https':'http')."://";
 
         if ($_SERVER["SERVER_PORT"] != "80") {
@@ -1032,9 +1067,11 @@ class App implements \ArrayAccess {
             $url .= $_SERVER["SERVER_NAME"];
         }
 
-        $url .= implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1));
+        if ($withpath) {
+            $url .= implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1));
+        }
 
-        return rtrim($url,'/');
+        return rtrim($url, '/');
     }
 
     /**
