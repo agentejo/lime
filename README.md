@@ -1,7 +1,7 @@
 Lime
 ====
 
-Lime is a micro web framework for quickly creating web applications in PHP with minimal effort inspired by sinatra.
+Lime is a micro web framework for quickly creating web applications in PHP with minimal effort.
 
 ```php
 $app = new Lime\App();
@@ -75,14 +75,14 @@ $url   = $app->baseUrl('/assets/script.js');
 In general you can utilize any template engine you want. Lime provides a simple template engine:
 
 ```php
-$app->get("/", function() use($app){
+$app->get("/", function() {
 
         $data = array(
             "name"  => 'Frank',
             "title" => 'Template demo'
         );
 
-        return $app->render("views/view.php with views/layout.php", $data);
+        return $this->render("views/view.php with views/layout.php", $data);
 });
 ```
 
@@ -90,7 +90,7 @@ views/view.php:
 
 ```php
 <p>
-    Hello <?php echo $name;?>.
+    Hello <?=$name?>.
 </p>
 ```
 
@@ -101,10 +101,10 @@ views/layout.php:
 <html lang="en-US">
 <head>
         <meta charset="UTF-8">
-        <title><?php echo $title;?></title>
+        <title><?=$title?></title>
 </head>
 <body>
-        <a href="<?php echo $this->routeUrl('/');?>">Home</a>
+        <a href="<?=$this->routeUrl('/')?>">Home</a>
         <hr>
         <?php echo $content_for_layout;?>
 </body>
@@ -219,14 +219,14 @@ You can utilize three system events: before, after and shutdown
 ```php
 // render custom error pages
 
-$app->on("after", function() use($app){
+$app->on("after", function() {
 
     switch($app->response->status){
         case "404":
-            $app->response->body = $app->render("views/404.php");
+            $this->response->body = $this->render("views/404.php");
             break;
         case "500":
-            $app->response->body = $app->render("views/500.php");
+            $this->response->body = $this->render("views/500.php");
             break;
     }
 });
