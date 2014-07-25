@@ -1149,13 +1149,9 @@ class App implements \ArrayAccess {
         return $this->helpers[$helper];
     }
 
-    public function isAbsolutePath($file) {
 
-        if ($file[0] == '/' || $file[0] == '\\' || (strlen($file) > 3 && ctype_alpha($file[0]) && $file[1] == ':' && ($file[2] == '\\' || $file[2] == '/')) || null !== parse_url($file, PHP_URL_SCHEME)) {
-            return true;
-        }
-
-        return false;
+    public function isAbsolutePath($path) {
+        return '/' == $path[0] || '\\' == $path[0] || (3 < strlen($path) && ctype_alpha($path[0]) && $path[1] == ':' && ('\\' == $path[2] || '/' == $path[2]));
     }
 
     // accces to services
