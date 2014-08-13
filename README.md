@@ -11,7 +11,7 @@ $app->bind("/", function() {
 });
 
 $app->run();
-```
+```e
 
 Just include one file (~ 35KB) and you're ready to go.
 
@@ -240,10 +240,10 @@ $app->on("after", function() {
 You can extend Lime by using your custom helpers:
 
 ```php
-class MyHelperClass extend Lime\Helper {
+class MyHelperClass extends Lime\Helper {
 
     public function test(){
-        echo "Hello!"
+        echo "Hello!";
     }
 }
 
