@@ -221,7 +221,7 @@ You can utilize three system events: before, after and shutdown
 
 $app->on("after", function() {
 
-    switch($app->response->status){
+    switch($this->response->status){
         case "404":
             $this->response->body = $this->render("views/404.php");
             break;
