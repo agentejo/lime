@@ -11,7 +11,7 @@ $app->bind("/", function() {
 });
 
 $app->run();
-```e
+```
 
 Just include one file (~ 35KB) and you're ready to go.
 
