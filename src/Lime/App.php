@@ -39,13 +39,17 @@ class App implements \ArrayAccess {
 
     protected $exit     = false;
 
+    /** @var Response|null  */
     public $response    = null;
 
     public $helpers;
     public $layout      = false;
 
+    /* global view variables */
+    public $viewvars    = [];
+
     /* status codes */
-    public static $statusCodes = array(
+    public static $statusCodes = [
     // Informational 1xx
     100 => 'Continue',
     101 => 'Switching Protocols',
@@ -91,10 +95,10 @@ class App implements \ArrayAccess {
     503 => 'Service Unavailable',
     504 => 'Gateway Timeout',
     505 => 'HTTP Version Not Supported'
-    );
+    ];
 
     /* mime types */
-    public static $mimeTypes = array(
+    public static $mimeTypes = [
         'asc'   => 'text/plain',
         'au'    => 'audio/basic',
         'avi'   => 'video/x-msvideo',
@@ -157,7 +161,7 @@ class App implements \ArrayAccess {
         'wmls'  => 'text/vnd.wap.wmlscript',
         'xsl'   => 'text/xml',
         'xml'   => 'text/xml'
-    );
+    ];
 
     /**
     * Constructor
@@ -167,7 +171,7 @@ class App implements \ArrayAccess {
 
         $self = $this;
 
-        $this->registry = array_merge(array(
+        $this->registry = array_merge([
             'debug'        => true,
             'app.name'     => 'LimeApp',
             'session.name' => 'limeappsession',
@@ -182,7 +186,10 @@ class App implements \ArrayAccess {
             'base_port'    => isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : 80,
             'docs_root'    => null,
             'site_url'     => null
-        ), $settings);
+        ], $settings);
+
+        // app modules container
+        $this->registry["modules"] = new \ArrayObject([]);
 
         if (!isset($this["site_url"])) {
             $this["site_url"] = $this->getSiteUrl(false);
@@ -196,10 +203,16 @@ class App implements \ArrayAccess {
         $this->registry["base_url"]   = rtrim($this->registry["base_url"], '/');
         $this->registry["base_route"] = rtrim($this->registry["base_route"], '/');
 
+        // default global viewvars
+        $this->viewvars["app"]        = $this;
+        $this->viewvars["base_url"]   = $this["base_url"];
+        $this->viewvars["base_route"] = $this["base_route"];
+        $this->viewvars["docs_root"]  = $this["docs_root"];
+
         self::$apps[$this["app.name"]] = $this;
 
         // default helpers
-        $this->helpers = new \ArrayObject(array_merge(array('session' => 'Lime\\Session', 'cache' => 'Lime\\Cache'), $this->registry["helpers"]));
+        $this->helpers = new \ArrayObject(array_merge(['session' => 'Lime\\Session', 'cache' => 'Lime\\Cache'], $this->registry["helpers"]));
 
         // register simple autoloader
         spl_autoload_register(function ($class) use($self){
@@ -239,7 +252,7 @@ class App implements \ArrayAccess {
     /**
     * Returns a closure that stores the result of the given closure
     * @param  String  $name
-    * @param  Closure $callable
+    * @param  \Closure $callable
     * @return Object
     */
     public function service($name, $callable) {
@@ -354,7 +367,7 @@ class App implements \ArrayAccess {
     /**
     * Put a value in the Lime registry
     * @param String $key  Key name
-    * @param Misc $value  Value
+    * @param Mixed $value  Value
     */
     public function set($key, $value) {
 
@@ -391,8 +404,8 @@ class App implements \ArrayAccess {
     /**
     * Get a value from the Lime registry
     * @param  String $key
-    * @param  Misc $default
-    * @return Misc
+    * @param  Mixed $default
+    * @return Mixed
     */
     public function retrieve($key, $default=null) {
         return fetch_from_array($this->registry, $key, $default);
@@ -401,7 +414,7 @@ class App implements \ArrayAccess {
 
     /**
     * Path helper method
-    * @return Misc
+    * @return Mixed
     */
     public function path(){
 
@@ -439,6 +452,8 @@ class App implements \ArrayAccess {
                 array_unshift($this->paths[$args[0]], rtrim(str_replace(DIRECTORY_SEPARATOR, '/', $args[1]), '/').'/');
                 break;
         }
+
+        return null;
     }
 
     /**
@@ -467,7 +482,7 @@ class App implements \ArrayAccess {
 
     /**
     * Cache helper method
-    * @return Misc
+    * @return Mixed
     */
     public function cache(){
 
@@ -481,12 +496,14 @@ class App implements \ArrayAccess {
             return $this("cache")->write($args[0], $args[1]);
             break;
         }
+
+        return null;
     }
 
     /**
     * Bind an event to closure
     * @param  String  $event
-    * @param  Closure $callback
+    * @param  \Closure $callback
     * @param  Integer $priority
     * @return void
     */
@@ -499,7 +516,7 @@ class App implements \ArrayAccess {
             $callback = $callback->bindTo($this, $this);
         }
 
-        $this->events[$event][] = array("fn" => $callback, "prio" => $priority);
+        $this->events[$event][] = ["fn" => $callback, "prio" => $priority];
     }
 
     /**
@@ -547,8 +564,8 @@ class App implements \ArrayAccess {
     */
     public function render($____template, $_____slots = []) {
 
-        $_____slots["app"] = $this;
-        $____layout        = $this->layout;
+        $_____slots = array_merge($this->viewvars, $_____slots);
+        $____layout = $this->layout;
 
         if (strpos($____template, ' with ') !== false ) {
             list($____template, $____layout) = explode(' with ', $____template, 2);
@@ -624,9 +641,9 @@ class App implements \ArrayAccess {
 
         if (!isset($this->blocks[$name])) return null;
 
-        $options = array_merge(array(
+        $options = array_merge([
             "print" => true
-        ), $options);
+        ], $options);
 
         $block = implode("\n", $this->blocks[$name]);
 
@@ -655,9 +672,9 @@ class App implements \ArrayAccess {
     /**
     * Get request variables
     * @param  String $index
-    * @param  Misc $default
+    * @param  Mixed $default
     * @param  Array $source
-    * @return Misc
+    * @return Mixed
     */
     public function param($index=null, $default = null, $source = null) {
 
@@ -721,7 +738,7 @@ class App implements \ArrayAccess {
     /**
     * Bind GET request to route
     * @param  String  $path
-    * @param  Closure  $callback
+    * @param  \Closure  $callback
     * @param  Boolean $condition
     * @return void
     */
@@ -733,7 +750,7 @@ class App implements \ArrayAccess {
     /**
     * Bind POST request to route
     * @param  String  $path
-    * @param  Closure  $callback
+    * @param  \Closure  $callback
     * @param  Boolean $condition
     * @return void
     */
@@ -798,7 +815,7 @@ class App implements \ArrayAccess {
     /**
     * Bind request to route
     * @param  String  $path
-    * @param  Closure  $callback
+    * @param  \Closure  $callback
     * @param  Boolean $condition
     * @return void
     */
@@ -823,9 +840,13 @@ class App implements \ArrayAccess {
     * @param  String $route Route to parse
     * @return void
     */
-    public function run() {
+    public function run($route = null) {
 
         $self = $this;
+
+        if ($route) {
+            $this["route"] = $route;
+        }
 
         register_shutdown_function(function() use($self){
 
@@ -835,7 +856,7 @@ class App implements \ArrayAccess {
 
             $error = error_get_last();
 
-            if ($error && in_array($error['type'], array(E_ERROR,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR))){
+            if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR])){
 
                 ob_end_clean();
 
@@ -866,7 +887,7 @@ class App implements \ArrayAccess {
     /**
     * Dispatch route
     * @param  String $path
-    * @return Misc
+    * @return Mixed
     */
     public function dispatch($path) {
 
@@ -951,6 +972,7 @@ class App implements \ArrayAccess {
         $output = false;
 
         if (isset($this->routes[$route])) {
+            $ret = null;
 
             if (is_callable($this->routes[$route])){
                 $ret = call_user_func($this->routes[$route], $params);
@@ -970,13 +992,13 @@ class App implements \ArrayAccess {
     * @param  String $class
     * @param  String $action
     * @param  Array  $params
-    * @return Misc
+    * @return Mixed
     */
     public function invoke($class, $action="index", $params=[]) {
 
         $controller = new $class($this);
 
-        return method_exists($controller, $action) ? call_user_func_array(array($controller,$action), $params):false;
+        return method_exists($controller, $action) ? call_user_func_array([$controller,$action], $params):false;
     }
 
     /**
@@ -997,11 +1019,11 @@ class App implements \ArrayAccess {
 
             case 'mobile':
 
-            $mobileDevices = array(
+            $mobileDevices = [
                 "midp","240x320","blackberry","netfront","nokia","panasonic","portalmmm","sharp","sie-","sonyericsson",
                 "symbian","windows ce","benq","mda","mot-","opera mini","philips","pocket pc","sagem","samsung",
                 "sda","sgh-","vodafone","xda","iphone", "ipod","android"
-            );
+            ];
 
             return preg_match('/(' . implode('|', $mobileDevices). ')/i',strtolower($_SERVER['HTTP_USER_AGENT']));
             break;
@@ -1049,6 +1071,8 @@ class App implements \ArrayAccess {
             // The remote IP address
             return $_SERVER['REMOTE_ADDR'];
         }
+
+        return null;
     }
 
     /**
@@ -1101,8 +1125,8 @@ class App implements \ArrayAccess {
      */
     public function encode($data, $pwd, $base64encoded = false) {
 
-        $key = array('');
-        $box = array('');
+        $key = [''];
+        $box = [''];
         $cipher = '';
 
         $pwd_length = strlen($pwd);
@@ -1150,6 +1174,65 @@ class App implements \ArrayAccess {
 
     public function isAbsolutePath($path) {
         return '/' == $path[0] || '\\' == $path[0] || (3 < strlen($path) && ctype_alpha($path[0]) && $path[1] == ':' && ('\\' == $path[2] || '/' == $path[2]));
+    }
+
+    public function module($name) {
+        return $this->registry["modules"]->offsetExists($name) && $this->registry["modules"][$name] ? $this->registry["modules"][$name] : null;
+    }
+
+    public function registerModule($name, $dir) {
+
+        $name = strtolower($name);
+
+        if (!isset($this->registry["modules"][$name])) {
+
+            $module = new Module($this);
+
+            $module->_dir      = $dir;
+            $module->_bootfile = "{$dir}/bootstrap.php";
+
+            $this->path($name, $dir);
+
+            $this->registry["modules"][$name] = $module;
+
+            $this->bootModule($module);
+        }
+
+        return $this->registry["modules"][$name];
+    }
+
+    public function loadModules($dirs, $autoload = true) {
+
+        $modules = [];
+        $dirs    = (array)$dirs;
+
+        foreach ($dirs as &$dir) {
+
+            if (file_exists($dir)){
+
+                // load modules
+                foreach (new \DirectoryIterator($dir) as $module) {
+
+                    if($module->isFile() || $module->isDot()) continue;
+
+                    $this->registerModule($module->getBasename(), $module->getRealPath());
+
+                    $modules[] = strtolower($module);
+                }
+
+                if ($autoload) $this["autoload"]->append($dir);
+
+            }
+        }
+
+        return $modules;
+    }
+
+    protected function bootModule($module) {
+
+        $app = $this;
+
+        require($module->_bootfile);
     }
 
     // accces to services
@@ -1234,6 +1317,7 @@ class Response {
 
 class AppAware {
 
+    /** @var App */
     public $app;
 
     public function __construct($app) {
@@ -1246,8 +1330,8 @@ class AppAware {
 
     public function __call($name, $arguments) {
 
-        if (is_callable(array($this->app, $name))) {
-            return call_user_func_array(array($this->app, $name), $arguments);
+        if (is_callable([$this->app, $name])) {
+            return call_user_func_array([$this->app, $name], $arguments);
         }
         return $this;
     }
@@ -1257,6 +1341,45 @@ class AppAware {
         return $this->app->helper($helper);
     }
 
+}
+
+class Module extends AppAware {
+
+    protected $apis = array();
+
+    public function extend($api) {
+
+        foreach($api as $name => $value) {
+
+            if ($value instanceof \Closure) {
+                $value = $value->bindTo($this, $this);
+            }
+
+            $this->apis[$name] = $value;
+        }
+    }
+
+    public function __set($name , $value) {
+
+        $this->extend(array($name => $value));
+    }
+    public function __get($name) {
+        return isset($this->apis[$name]) ? $this->apis[$name] :null;
+    }
+    public function __isset($name) {
+        return isset($this->apis[$name]);
+    }
+    public function __unset($name) {
+        unset($this->apis[$name]);
+    }
+    public function __call($name, $arguments) {
+
+        if(isset($this->apis[$name]) && is_callable($this->apis[$name])) {
+            return call_user_func_array($this->apis[$name], $arguments);
+        }
+
+        return null;
+    }
 }
 
 
@@ -1327,10 +1450,10 @@ class Cache extends Helper {
 
         $expire = ($duration==-1) ? -1:(time() + (is_string($duration) ? strtotime($duration):$duration));
 
-        $safe_var = array(
+        $safe_var = [
             'expire' => $expire,
             'value' => serialize($value)
-        );
+        ];
 
         file_put_contents($this->cachePath.md5($this->prefix.'-'.$key).".cache" , serialize($safe_var));
     }
