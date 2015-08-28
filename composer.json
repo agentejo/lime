@@ -1,13 +1,15 @@
 {
     "name": "lime/lime",
     "description": "The PHP micro-framework",
-    "keywords": ["microframework"],
+    "keywords": ["php", "micro-framework", "microframework", "lime"],
     "homepage": "https://github.com/aheinze/Lime",
     "license": "MIT",
     "authors": [
         {
             "name": "Artur Heinze",
-            "email": "faulancer@gmail.com"
+            "email": "faulancer@gmail.com",
+            "homepage": "http://agentejo.com/",
+            "role": "Developer"
         }
     ],
 
