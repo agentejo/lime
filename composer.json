@@ -1,8 +1,8 @@
 {
-    "name": "aheinze/lime",
+    "name": "peterbrinck/lime",
     "description": "The PHP micro-framework",
     "keywords": ["php", "micro-framework", "microframework", "lime"],
-    "homepage": "https://github.com/aheinze/Lime",
+    "homepage": "https://github.com/peterbrinck/Lime",
     "license": "MIT",
     "authors": [
         {
