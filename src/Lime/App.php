@@ -457,9 +457,8 @@ class App implements \ArrayAccess {
     }
 
     /**
-     * [pathToUrl description]
-     * @param  [type] $path [description]
-     * @return [type]       [description]
+     * @param $path
+     * @return bool|string
      */
     public function pathToUrl($path) {
 
@@ -471,11 +470,14 @@ class App implements \ArrayAccess {
             $root = str_replace(DIRECTORY_SEPARATOR, '/', $this['docs_root']);
 
             $url = '/'.ltrim(str_replace($root, '', $file), '/');
+            $url = implode('/', array_map('rawurlencode', explode('/', $url)));
         }
 
+        /*
         if ($this->registry['base_port'] != "80") {
             $url = $this->registry['site_url'].$url;
         }
+        */
 
         return $url;
     }
