@@ -26,6 +26,10 @@
 
 namespace Lime;
 
+if (!isset($_SERVER["PATH_INFO"])) {
+    $_SERVER["PATH_INFO"] = explode("?", $_SERVER["REQUEST_URI"])[0];
+}
+var_dump($_SERVER);
 
 class App implements \ArrayAccess {
 
@@ -177,7 +181,7 @@ class App implements \ArrayAccess {
             'session.name' => 'limeappsession',
             'autoload'     => new \ArrayObject([]),
             'sec-key'      => 'xxxxx-SiteSecKeyPleaseChangeMe-xxxxx',
-            'route'        => isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] ? isset($_SERVER["REQUEST_URI"]) ? explode("?", $_SERVER["REQUEST_URI"])[0] : "/",
+            'route'        => isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] : "/",
             'charset'      => 'UTF-8',
             'helpers'      => [],
             'base_url'     => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
