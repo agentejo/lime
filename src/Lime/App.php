@@ -26,7 +26,7 @@
 
 namespace Lime;
 
-if (!isset($_SERVER["PATH_INFO"])) {
+if (!isset($_SERVER["PATH_INFO"]) || !$_SERVER["PATH_INFO"]) {
     $_SERVER["PATH_INFO"] = explode("?", $_SERVER["REQUEST_URI"])[0];
 }
 var_dump($_SERVER);
