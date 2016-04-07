@@ -300,9 +300,11 @@ class App implements \ArrayAccess {
 
         if (strpos($path, ':')===false) {
 
+            /*
             if ($this->registry['base_port'] != '80') {
                 $url .= $this->registry['site_url'];
             }
+            */
 
             $url .= $this->registry["base_url"].'/'.ltrim($path, '/');
 
@@ -329,9 +331,11 @@ class App implements \ArrayAccess {
 
         $url = '';
 
+        /*
         if ($this->registry['base_port'] != '80') {
             $url .= $this->registry['site_url'];
         }
+        */
 
         $url .= $this->registry["base_route"];
 
@@ -398,7 +402,7 @@ class App implements \ArrayAccess {
             break;
         }
 
-        return true;
+        return $this;
     }
 
     /**
@@ -450,7 +454,8 @@ class App implements \ArrayAccess {
                     $this->paths[$args[0]] = [];
                 }
                 array_unshift($this->paths[$args[0]], rtrim(str_replace(DIRECTORY_SEPARATOR, '/', $args[1]), '/').'/');
-                break;
+
+                return $this;
         }
 
         return null;
@@ -496,7 +501,6 @@ class App implements \ArrayAccess {
             return $this("cache")->read($args[0]);
         case 2:
             return $this("cache")->write($args[0], $args[1]);
-            break;
         }
 
         return null;
@@ -519,6 +523,8 @@ class App implements \ArrayAccess {
         }
 
         $this->events[$event][] = ["fn" => $callback, "prio" => $priority];
+
+        return $this;
     }
 
     /**
@@ -773,7 +779,7 @@ class App implements \ArrayAccess {
 
         $this->bind('/'.$clean.'/*', function() use($self, $class, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+            $parts      = explode('/', trim(preg_replace("#$clean#","",$self["route"],1),'/'));
             $action     = isset($parts[0]) ? $parts[0]:"index";
             $params     = count($parts)>1 ? array_slice($parts, 1):[];
 
@@ -798,7 +804,7 @@ class App implements \ArrayAccess {
 
         $this->bind('/'.$clean.'/*', function() use($self, $namespace, $clean) {
 
-            $parts      = explode('/', trim(str_replace($clean,"",$self["route"]),'/'));
+            $parts      = explode('/', trim(preg_replace("#$clean#","",$self["route"],1),'/'));
             $class      = $namespace.'\\'.$parts[0];
             $action     = isset($parts[1]) ? $parts[1]:"index";
             $params     = count($parts)>2 ? array_slice($parts, 2):[];
@@ -863,9 +869,9 @@ class App implements \ArrayAccess {
                 ob_end_clean();
 
                 $self->response->status = "500";
-                $self->response->body   = $self["debug"] ? json_encode($error):'Internal Error.';
+                $self->response->body   = $self["debug"] ? json_encode($error, JSON_PRETTY_PRINT):'Internal Error.';
 
-            } elseif (!$self->response->body) {
+            } elseif (!$self->response->body && !is_string($self->response->body)) {
                 $self->response->status = "404";
                 $self->response->body   = "Path not found.";
             }
@@ -909,7 +915,7 @@ class App implements \ArrayAccess {
                     /* e.g. #\.html$#  */
                     if (substr($route,0,1)=='#' && substr($route,-1)=='#'){
 
-                        if (preg_match($route,$path, $matches)){
+                        if (preg_match($route, $path, $matches)){
                             $params[':captures'] = array_slice($matches, 1);
                             $found = $this->render_route($route, $params);
                             break;
@@ -952,7 +958,7 @@ class App implements \ArrayAccess {
                             }
 
                             if ($matched){
-                                $found = $this->render_route($route, $params);;
+                                $found = $this->render_route($route, $params);
                                 break;
                             }
                         }
@@ -1203,7 +1209,7 @@ class App implements \ArrayAccess {
         return $this->registry["modules"][$name];
     }
 
-    public function loadModules($dirs, $autoload = true) {
+    public function loadModules($dirs, $autoload = true, $prefix = false) {
 
         $modules = [];
         $dirs    = (array)$dirs;
@@ -1212,12 +1218,16 @@ class App implements \ArrayAccess {
 
             if (file_exists($dir)){
 
+                $pfx = is_bool($prefix) ? strtolower(basename($dir)) : $prefix;
+
                 // load modules
                 foreach (new \DirectoryIterator($dir) as $module) {
 
-                    if($module->isFile() || $module->isDot()) continue;
+                    if ($module->isFile() || $module->isDot()) continue;
 
-                    $this->registerModule($module->getBasename(), $module->getRealPath());
+                    $name = $prefix ? "{$pfx}-".$module->getBasename() : $module->getBasename();
+
+                    $this->registerModule($name, $module->getRealPath());
 
                     $modules[] = strtolower($module);
                 }
@@ -1250,13 +1260,13 @@ class App implements \ArrayAccess {
 
     public function offsetGet($key) {
 
-        $value = $this->retrieve($key, 'key-not-found');
+        $value = $this->retrieve($key, null);
 
-        if ($value!=='key-not-found') {
-            return $value instanceof \Closure ? $value($this) : $value;
+        if (!is_null($value)) {
+            return ($value instanceof \Closure) ? $value($this) : $value;
         }
 
-        throw new \InvalidArgumentException(sprintf('Identifier "%s" is not defined.', $key));
+        return $value;
     }
 
     public function offsetExists($key) {
@@ -1343,6 +1353,11 @@ class AppAware {
         return $this->app->helper($helper);
     }
 
+    // accces to services
+    public function __get($name) {
+        return $this->app[$name];
+    }
+
 }
 
 class Module extends AppAware {
@@ -1378,6 +1393,10 @@ class Module extends AppAware {
 
         if(isset($this->apis[$name]) && is_callable($this->apis[$name])) {
             return call_user_func_array($this->apis[$name], $arguments);
+        }
+
+        if(isset($this->apis['__call']) && is_callable($this->apis['__call'])) {
+            return call_user_func_array($this->apis['__call'], [$name, $arguments]);
         }
 
         return null;
