@@ -1294,8 +1294,10 @@ class Response {
     public $etag    = false;
     public $headers = [];
 
-    public function __construct($mimeType) {
-        $this->mime = $mimeType;
+    public function __construct($mimeType=null) {
+        if ($mimeType) {
+            $this->mime = $mimeType;
+        }
     }
 
     public function flush() {
