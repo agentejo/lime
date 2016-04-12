@@ -848,7 +848,7 @@ class App implements \ArrayAccess {
     * @param  String $route Route to parse
     * @return void
     */
-    public function run($route = null) {
+    public function run($route = null, $mimeType = null) {
 
         $self = $this;
 
@@ -883,7 +883,7 @@ class App implements \ArrayAccess {
             $self->trigger("shutdown");
         });
 
-        $this->response = new Response();
+        $this->response = new Response($mimeType);
 
         $this->trigger("before");
 
@@ -1294,8 +1294,8 @@ class Response {
     public $etag    = false;
     public $headers = [];
 
-    public function __construct() {
-
+    public function __construct($mimeType) {
+        $this->mime = $mimeType;
     }
 
     public function flush() {
