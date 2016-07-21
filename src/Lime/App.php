@@ -1312,7 +1312,7 @@ class Response {
                 header('ETag: "'.md5($this->body).'"');
             }
 
-            if (is_array($this->body)) {
+            if (is_array($this->body) || is_object($this->body)) {
                 $output = json_encode($this->body);
                 $this->mime = "json";
             }
