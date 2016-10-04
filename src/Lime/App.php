@@ -871,7 +871,7 @@ class App implements \ArrayAccess {
                 $self->response->status = "500";
                 $self->response->body   = $self["debug"] ? json_encode($error, JSON_PRETTY_PRINT):'Internal Error.';
 
-            } elseif (!$self->response->body && !is_string($self->response->body)) {
+            } elseif (!$self->response->body && !is_string($self->response->body) && !is_array($self->response->body)) {
                 $self->response->status = "404";
                 $self->response->body   = "Path not found.";
             }
@@ -1119,9 +1119,8 @@ class App implements \ArrayAccess {
     * Create Hash
     * @return String
     */
-    public function hash($text) {
-
-        return md5($this->encode($text, $this["sec-key"], true));
+    public function hash($text, $algo = PASSWORD_BCRYPT) {
+        return password_hash($text, $algo);
     }
 
     /**
