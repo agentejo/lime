@@ -279,7 +279,17 @@ class App implements \ArrayAccess {
         }
 
         if (is_numeric($data) && $data) {
-           $this->response->status = $data;
+            
+            $this->response->status = $data;
+
+            if (isset(self::$statusCodes[$data])) {
+                
+                if ($this->response->mime == 'json') {
+                    $this->response->body = json_encode(["error" => self::$statusCodes[$data]]); 
+                } else {
+                    $this->response->body = self::$statusCodes[$data]; 
+                }
+            }
         }
 
         if ($status) {
@@ -713,8 +723,16 @@ class App implements \ArrayAccess {
 
         foreach((array)$href as $style) {
 
-            $ispath = strpos($style, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $style);
-            $list[] = '<link href="'.($ispath ? $this->pathToUrl($style):$style).($version ? "?ver={$version}":"").'" type="text/css" rel="stylesheet">';
+            $type = 'text/css';
+            $rel  = 'stylesheet';
+            $src  = $style;
+
+            if (is_array($style)) {
+                extract($style);
+            }
+
+            $ispath = strpos($src, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $src);
+            $list[] = '<link href="'.($ispath ? $this->pathToUrl($src):$src).($version ? "?ver={$version}":"").'" type="'.$type.'" rel="'.$rel.'">';
         }
 
         return implode("\n", $list);
@@ -730,8 +748,17 @@ class App implements \ArrayAccess {
         $list = [];
 
         foreach((array)$src as $script) {
-            $ispath = strpos($script, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $script);
-            $list[] = '<script src="'.($ispath ? $this->pathToUrl($script):$script).($version ? "?ver={$version}":"").'" type="text/javascript"></script>';
+
+            $type = 'text/javascript';
+            $src  = $script;
+            $load = '';
+
+            if (is_array($script)) {
+                extract($script);
+            }
+
+            $ispath = strpos($src, ':') !== false && !preg_match('#^(|http\:|https\:)//#', $src);
+            $list[] = '<script src="'.($ispath ? $this->pathToUrl($src):$src).($version ? "?ver={$version}":"").'" type="'.$type.'" '.$load.'></script>';
         }
 
         return implode("\n", $list);
@@ -741,14 +768,20 @@ class App implements \ArrayAccess {
 
         $list = [];
 
-        foreach((array)$src as $script) {
+        foreach((array)$src as $asset) {
 
-            if (@substr($script, -3) == ".js") {
-                $list[] = $this->script($script, $version);
+            $src = $asset;
+
+            if (is_array($asset)) {
+                extract($asset);
             }
 
-            if (@substr($script, -4) == ".css") {
-                $list[] = $this->style($script, $version);
+            if (@substr($src, -3) == ".js") {
+                $list[] = $this->script($asset, $version);
+            }
+
+            if (@substr($src, -4) == ".css") {
+                $list[] = $this->style($asset, $version);
             }
         }
 
@@ -850,6 +883,11 @@ class App implements \ArrayAccess {
         // make $this available in closures
         if (is_object($callback) && $callback instanceof \Closure) {
             $callback = $callback->bindTo($this, $this);
+        }
+
+        // autou-register for /route/* also /route
+        if (substr($path, -2) == '/*' && !isset($this->routes[substr($path, 0, -2)])) {
+            $this->bind(substr($path, 0, -2), $callback, $condition);
         }
 
         $this->routes[$path] = $callback;
@@ -1112,9 +1150,9 @@ class App implements \ArrayAccess {
     */
     public function getSiteUrl($withpath = false) {
 
-        $url = ($this->req_is("ssl") ? 'https':'http')."://";
+        $url = ($this->req_is('ssl') ? 'https':'http').'://';
 
-        if ($this->registry['base_port'] != "80") {
+        if (!in_array($this->registry['base_port'], ['80', '443'])) {
             $url .= $this->registry['base_host'].":".$this->registry['base_port'];
         } else {
             $url .= $this->registry['base_host'];
