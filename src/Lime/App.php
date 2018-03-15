@@ -1056,7 +1056,7 @@ class App implements \ArrayAccess {
 
         $controller = new $class($this);
 
-        return method_exists($controller, $action) ? call_user_func_array([$controller,$action], $params):false;
+        return method_exists($controller, $action) && is_callable([$controller, $action]) ? call_user_func_array([$controller,$action], $params):false;
     }
 
     /**
