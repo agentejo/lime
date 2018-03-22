@@ -1361,6 +1361,14 @@ class Response {
                 header('ETag: "'.md5($this->body).'"');
             }
 
+            if (is_array($this->body) || is_object($this->body)) {
+                $output = json_encode($this->body);
+                $this->mime = "json";
+            }
+            else {
+                $output = $this->body;
+            }
+
             header('HTTP/1.0 '.$this->status.' '.App::$statusCodes[$this->status]);
             header('Content-type: '.App::$mimeTypes[$this->mime]);
 
@@ -1368,7 +1376,7 @@ class Response {
                 header($h);
             }
 
-            echo is_array($this->body) ? json_encode($this->body) : $this->body;
+            echo $output;
         }
     }
 }
