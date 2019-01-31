@@ -1,5 +1,4 @@
 <?php
-
 /*
  * Lime.
  *
@@ -105,7 +104,7 @@ class App implements \ArrayAccess {
         'bin'   => 'application/octet-stream',
         'class' => 'application/octet-stream',
         'css'   => 'text/css',
-        'csv' => 'application/vnd.ms-excel',
+        'csv'   => 'application/vnd.ms-excel',
         'doc'   => 'application/msword',
         'dll'   => 'application/octet-stream',
         'dvi'   => 'application/x-dvi',
@@ -115,6 +114,11 @@ class App implements \ArrayAccess {
         'json'  => 'application/json',
         'js'    => 'application/x-javascript',
         'txt'   => 'text/plain',
+        'rtf'   => 'text/rtf',
+        'wml'   => 'text/vnd.wap.wml',
+        'wmls'  => 'text/vnd.wap.wmlscript',
+        'xsl'   => 'text/xml',
+        'xml'   => 'text/xml',
         'bmp'   => 'image/bmp',
         'rss'   => 'application/rss+xml',
         'atom'  => 'application/atom+xml',
@@ -123,21 +127,31 @@ class App implements \ArrayAccess {
         'jpg'   => 'image/jpeg',
         'jpe'   => 'image/jpeg',
         'png'   => 'image/png',
+        'tiff'  => 'image/tiff',
+        'tif'   => 'image/tiff',
         'ico'   => 'image/vnd.microsoft.icon',
+        'svg'   => 'image/svg+xml',
         'mpeg'  => 'video/mpeg',
         'mpg'   => 'video/mpeg',
         'mpe'   => 'video/mpeg',
+        'webm'  => 'video/webm',
         'qt'    => 'video/quicktime',
         'mov'   => 'video/quicktime',
         'wmv'   => 'video/x-ms-wmv',
         'mp2'   => 'audio/mpeg',
         'mp3'   => 'audio/mpeg',
+        'snd'   => 'audio/basic',
+        'midi'  => 'audio/midi',
+        'mid'   => 'audio/midi',
+        'm3u'   => 'audio/x-mpegurl',
         'rm'    => 'audio/x-pn-realaudio',
         'ram'   => 'audio/x-pn-realaudio',
         'rpm'   => 'audio/x-pn-realaudio-plugin',
         'ra'    => 'audio/x-realaudio',
         'wav'   => 'audio/x-wav',
+        'weba'  => 'audio/webm',
         'zip'   => 'application/zip',
+        'epub'  => 'application/epub+zip',
         'pdf'   => 'application/pdf',
         'xls'   => 'application/vnd.ms-excel',
         'ppt'   => 'application/vnd.ms-powerpoint',
@@ -150,17 +164,6 @@ class App implements \ArrayAccess {
         'swf'   => 'application/x-shockwave-flash',
         'tar'   => 'application/x-tar',
         'xhtml' => 'application/xhtml+xml',
-        'snd'   => 'audio/basic',
-        'midi'  => 'audio/midi',
-        'mid'   => 'audio/midi',
-        'm3u'   => 'audio/x-mpegurl',
-        'tiff'  => 'image/tiff',
-        'tif'   => 'image/tiff',
-        'rtf'   => 'text/rtf',
-        'wml'   => 'text/vnd.wap.wml',
-        'wmls'  => 'text/vnd.wap.wmlscript',
-        'xsl'   => 'text/xml',
-        'xml'   => 'text/xml'
     ];
 
     /**
@@ -170,6 +173,7 @@ class App implements \ArrayAccess {
     public function __construct ($settings = []) {
 
         $self = $this;
+        $base_url = implode('/', array_slice(explode('/', $_SERVER['SCRIPT_NAME']), 0, -1));
 
         $this->registry = array_merge([
             'debug'        => true,
@@ -177,39 +181,49 @@ class App implements \ArrayAccess {
             'session.name' => 'limeappsession',
             'autoload'     => new \ArrayObject([]),
             'sec-key'      => 'xxxxx-SiteSecKeyPleaseChangeMe-xxxxx',
-            'route'        => isset($_SERVER["PATH_INFO"]) ? $_SERVER["PATH_INFO"] : "/",
+            'route'        => $_SERVER['PATH_INFO'] ?? '/',
             'charset'      => 'UTF-8',
             'helpers'      => [],
-            'base_url'     => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
-            'base_route'   => implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1)),
-            'base_host'    => isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : php_uname('n'),
-            'base_port'    => isset($_SERVER['SERVER_PORT']) ? $_SERVER['SERVER_PORT'] : 80,
+            'base_url'     => $base_url,
+            'base_route'   => $base_url,
+            'base_host'    => $_SERVER['SERVER_NAME'] ?? php_uname('n'),
+            'base_port'    => $_SERVER['SERVER_PORT'] ?? 80,
             'docs_root'    => null,
             'site_url'     => null
         ], $settings);
 
         // app modules container
-        $this->registry["modules"] = new \ArrayObject([]);
+        $this->registry['modules'] = new \ArrayObject([]);
 
-        if (!isset($this["site_url"])) {
-            $this["site_url"] = $this->getSiteUrl(false);
+        // try to guess site url
+        if (!isset($this['site_url'])) {
+
+            $url = ($this->req_is('ssl') ? 'https':'http').'://';
+
+            if (!in_array($this->registry['base_port'], ['80', '443'])) {
+                $url .= $this->registry['base_host'].':'.$this->registry['base_port'];
+            } else {
+                $url .= $this->registry['base_host'];
+            }
+
+            $this['site_url'] = trim($url, '/');
         }
 
-        if (!isset($this["docs_root"])) {
-            $this["docs_root"] = str_replace(DIRECTORY_SEPARATOR, '/', isset($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : dirname($_SERVER['SCRIPT_FILENAME']));
+        if (!isset($this['docs_root'])) {
+            $this['docs_root'] = str_replace(DIRECTORY_SEPARATOR, '/', isset($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : dirname($_SERVER['SCRIPT_FILENAME']));
         }
 
         // make sure base + route url doesn't end with a slash;
-        $this->registry["base_url"]   = rtrim($this->registry["base_url"], '/');
-        $this->registry["base_route"] = rtrim($this->registry["base_route"], '/');
+        $this->registry['base_url']   = rtrim($this->registry['base_url'], '/');
+        $this->registry['base_route'] = rtrim($this->registry['base_route'], '/');
 
         // default global viewvars
-        $this->viewvars["app"]        = $this;
-        $this->viewvars["base_url"]   = $this["base_url"];
-        $this->viewvars["base_route"] = $this["base_route"];
-        $this->viewvars["docs_root"]  = $this["docs_root"];
+        $this->viewvars['app']        = $this;
+        $this->viewvars['base_url']   = $this['base_url'];
+        $this->viewvars['base_route'] = $this['base_route'];
+        $this->viewvars['docs_root']  = $this['docs_root'];
 
-        self::$apps[$this["app.name"]] = $this;
+        self::$apps[$this['app.name']] = $this;
 
         // default helpers
         $this->helpers = new \ArrayObject(array_merge(['session' => 'Lime\\Session', 'cache' => 'Lime\\Cache'], $this->registry["helpers"]));
@@ -217,7 +231,7 @@ class App implements \ArrayAccess {
         // register simple autoloader
         spl_autoload_register(function ($class) use($self){
 
-            foreach ($self->retrieve("autoload", []) as $dir) {
+            foreach ($self->retrieve('autoload', []) as $dir) {
 
                 $class_file = $dir.'/'.str_replace('\\', '/', $class).'.php';
 
@@ -231,8 +245,8 @@ class App implements \ArrayAccess {
 
         // check for php://input and merge with $_REQUEST
         if (
-            (isset($_SERVER["CONTENT_TYPE"]) && stripos($_SERVER["CONTENT_TYPE"],'application/json')!==false) ||
-            (isset($_SERVER["HTTP_CONTENT_TYPE"]) && stripos($_SERVER["HTTP_CONTENT_TYPE"],'application/json')!==false) // PHP build in Webserver !?
+            (isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'],'application/json')!==false) ||
+            (isset($_SERVER['HTTP_CONTENT_TYPE']) && stripos($_SERVER['HTTP_CONTENT_TYPE'],'application/json')!==false) // PHP build in Webserver !?
         ) {
             if ($json = json_decode(@file_get_contents('php://input'), true)) {
                 $_REQUEST = array_merge($_REQUEST, $json);
@@ -256,7 +270,8 @@ class App implements \ArrayAccess {
     * @return Object
     */
     public function service($name, $callable) {
-        $this[$name] = function ($c) use ($callable) {
+
+        $this->registry[$name] = function($c) use($callable) {
             static $object;
 
             if (null === $object) {
@@ -265,6 +280,8 @@ class App implements \ArrayAccess {
 
             return $object;
         };
+
+        return $this;
     }
 
     /**
@@ -274,26 +291,23 @@ class App implements \ArrayAccess {
 
         $this->exit = true;
 
-        if (is_string($data) && $data) {
-           $this->response->body = $data;
-        }
-
-        if (is_numeric($data) && $data) {
-            
-            $this->response->status = $data;
-
-            if (isset(self::$statusCodes[$data])) {
-                
-                if ($this->response->mime == 'json') {
-                    $this->response->body = json_encode(["error" => self::$statusCodes[$data]]); 
-                } else {
-                    $this->response->body = self::$statusCodes[$data]; 
-                }
-            }
-        }
-
         if ($status) {
            $this->response->status = $status;
+        }
+
+        if ($data) {
+            $this->response->body = $data;
+        }
+
+        if (is_numeric($data) && isset(self::$statusCodes[$data])) {
+
+            $this->response->status = $data;
+
+            if ($this->response->mime == 'json') {
+                $this->response->body = json_encode(['error' => self::$statusCodes[$data]]);
+            } else {
+                $this->response->body = self::$statusCodes[$data];
+            }
         }
 
         if ($data || $status) {
@@ -328,7 +342,7 @@ class App implements \ArrayAccess {
             }
             */
 
-            $url .= $this->registry["base_url"].'/'.ltrim($path, '/');
+            $url .= $this->registry['base_url'].'/'.ltrim($path, '/');
 
         } else {
             $url = $this->pathToUrl($path);
@@ -359,7 +373,7 @@ class App implements \ArrayAccess {
         }
         */
 
-        $url .= $this->registry["base_route"];
+        $url .= $this->registry['base_route'];
 
         return $url.'/'.ltrim($path, '/');
     }
@@ -424,6 +438,8 @@ class App implements \ArrayAccess {
             break;
         }
 
+
+
         return $this;
     }
 
@@ -484,10 +500,23 @@ class App implements \ArrayAccess {
     }
 
     /**
+     * @param $namespace
+     * @return array
+     */
+    public function paths($namespace = null) {
+
+        if (!$namespace) {
+            return $this->paths;
+        }
+
+        return $this->paths[$namespace] ?? [];
+    }
+
+    /**
      * @param $path
      * @return bool|string
      */
-    public function pathToUrl($path) {
+    public function pathToUrl($path, $full = false) {
 
         $url = false;
 
@@ -498,13 +527,11 @@ class App implements \ArrayAccess {
 
             $url = '/'.ltrim(str_replace($root, '', $file), '/');
             $url = implode('/', array_map('rawurlencode', explode('/', $url)));
-        }
 
-        /*
-        if ($this->registry['base_port'] != "80") {
-            $url = $this->registry['site_url'].$url;
+            if ($full) {
+                $url = rtrim($this->registry['site_url'], '/').$url;
+            }
         }
-        */
 
         return $url;
     }
@@ -519,10 +546,9 @@ class App implements \ArrayAccess {
 
         switch(count($args)){
         case 1:
-
-            return $this("cache")->read($args[0]);
+            return $this->helper('cache')->read($args[0]);
         case 2:
-            return $this("cache")->write($args[0], $args[1]);
+            return $this->helper('cache')->write($args[0], $args[1]);
         }
 
         return null;
@@ -537,6 +563,14 @@ class App implements \ArrayAccess {
     */
     public function on($event, $callback, $priority = 0){
 
+        if (is_array($event)) {
+
+            foreach ($event as &$evt) {
+                $this->on($evt, $callback, $priority);
+            }
+            return $this;
+        }
+
         if (!isset($this->events[$event])) $this->events[$event] = [];
 
         // make $this available in closures
@@ -544,7 +578,7 @@ class App implements \ArrayAccess {
             $callback = $callback->bindTo($this, $this);
         }
 
-        $this->events[$event][] = ["fn" => $callback, "prio" => $priority];
+        $this->events[$event][] = ['fn' => $callback, 'prio' => $priority];
 
         return $this;
     }
@@ -567,16 +601,16 @@ class App implements \ArrayAccess {
 
         $queue = new \SplPriorityQueue();
 
-        foreach($this->events[$event] as $index => $action){
-            $queue->insert($index, $action["prio"]);
+        foreach ($this->events[$event] as $index => $action){
+            $queue->insert($index, $action['prio']);
         }
 
         $queue->top();
 
-        while($queue->valid()){
+        while ($queue->valid()){
             $index = $queue->current();
-            if (is_callable($this->events[$event][$index]["fn"])){
-                if (call_user_func_array($this->events[$event][$index]["fn"], $params) === false) {
+            if (is_callable($this->events[$event][$index]['fn'])){
+                if (call_user_func_array($this->events[$event][$index]['fn'], $params) === false) {
                     break; // stop Propagation
                 }
             }
@@ -658,7 +692,6 @@ class App implements \ArrayAccess {
         if (isset($this->blocks[$name])){
             $this->blocks[$name][] = $out;
         }
-
     }
 
     /**
@@ -672,12 +705,12 @@ class App implements \ArrayAccess {
         if (!isset($this->blocks[$name])) return null;
 
         $options = array_merge([
-            "print" => true
+            'print' => true
         ], $options);
 
         $block = implode("\n", $this->blocks[$name]);
 
-        if ($options["print"]){
+        if ($options['print']){
             echo $block;
         }
 
@@ -693,7 +726,7 @@ class App implements \ArrayAccess {
     public function escape($string, $charset=null) {
 
         if (is_null($charset)){
-            $charset = $this["charset"];
+            $charset = $this['charset'];
         }
 
         return htmlspecialchars($string, ENT_QUOTES, $charset);
@@ -709,7 +742,24 @@ class App implements \ArrayAccess {
     public function param($index=null, $default = null, $source = null) {
 
         $src = $source ? $source : $_REQUEST;
-        return fetch_from_array($src, $index, $default);
+        $cast = null;
+
+        if (strpos($index, ':') !== false) {
+            list($index, $cast) = explode(':', $index, 2);
+        }
+
+        $value = fetch_from_array($src, $index, $default);
+
+        if ($cast) {
+
+            if (in_array($cast, ['bool', 'boolean']) && is_string($value) && in_array($cast, ['true', 'false'])) {
+                $value = $value == 'true' ? true : false;
+            }
+
+            settype($value, $cast);
+        }
+
+        return $value;
     }
 
     /**
@@ -776,11 +826,11 @@ class App implements \ArrayAccess {
                 extract($asset);
             }
 
-            if (@substr($src, -3) == ".js") {
+            if (@substr($src, -3) == '.js') {
                 $list[] = $this->script($asset, $version);
             }
 
-            if (@substr($src, -4) == ".css") {
+            if (@substr($src, -4) == '.css') {
                 $list[] = $this->style($asset, $version);
             }
         }
@@ -796,7 +846,7 @@ class App implements \ArrayAccess {
     * @return void
     */
     public function get($path, $callback, $condition = true){
-        if (!$this->req_is("get")) return;
+        if (!$this->req_is('get')) return;
         $this->bind($path, $callback, $condition);
     }
 
@@ -808,7 +858,7 @@ class App implements \ArrayAccess {
     * @return void
     */
     public function post($path, $callback, $condition = true){
-        if (!$this->req_is("post")) return;
+        if (!$this->req_is('post')) return;
         $this->bind($path, $callback, $condition);
     }
 
@@ -832,8 +882,7 @@ class App implements \ArrayAccess {
         });
 
         $this->bind('/'.$clean, function() use($self, $class) {
-
-            return $self->invoke($class,'index', []);
+            return $self->invoke($class, 'index', []);
         });
     }
 
@@ -861,7 +910,7 @@ class App implements \ArrayAccess {
 
             $class = $namespace."\\".array_pop(explode('\\', $namespace));
 
-            return $self->invoke($class,'index', []);
+            return $self->invoke($class, 'index', []);
         });
     }
 
@@ -903,7 +952,7 @@ class App implements \ArrayAccess {
         $self = $this;
 
         if ($route) {
-            $this["route"] = $route;
+            $this->registry['route'] = $route;
         }
 
         register_shutdown_function(function() use($self){
@@ -918,28 +967,26 @@ class App implements \ArrayAccess {
 
                 ob_end_clean();
 
-                $self->response->status = "500";
-                $self->response->body   = $self["debug"] ? json_encode($error, JSON_PRETTY_PRINT):'Internal Error.';
+                $self->response->status = '500';
+                $self->response->body   = $self['debug'] ? json_encode($error, JSON_PRETTY_PRINT):'Internal Error.';
 
             } elseif (!$self->response->body && !is_string($self->response->body) && !is_array($self->response->body)) {
-                $self->response->status = "404";
-                $self->response->body   = "Path not found.";
+                $self->response->status = '404';
+                $self->response->body   = 'Path not found.';
             }
 
-            $self->trigger("after");
+            $self->trigger('after');
 
             echo $self->response->flush();
 
-            $self->trigger("shutdown");
+            $self->trigger('shutdown');
         });
 
         $this->response = new Response();
+        $this->trigger('before');
+        $this->response->body = $this->dispatch($this->registry['route']);
 
-        $this->trigger("before");
-
-        $this->response->body = $this->dispatch($this["route"]);
-
-        if ($this->response->gzip && !ob_start("ob_gzhandler")) ob_start();
+        if ($this->response->gzip && !ob_start('ob_gzhandler')) ob_start();
     }
 
     /**
@@ -1030,6 +1077,7 @@ class App implements \ArrayAccess {
         $output = false;
 
         if (isset($this->routes[$route])) {
+
             $ret = null;
 
             if (is_callable($this->routes[$route])){
@@ -1056,7 +1104,9 @@ class App implements \ArrayAccess {
 
         $controller = new $class($this);
 
-        return method_exists($controller, $action) && is_callable([$controller, $action]) ? call_user_func_array([$controller,$action], $params):false;
+        return method_exists($controller, $action) && is_callable([$controller, $action])
+                ? call_user_func_array([$controller,$action], $params)
+                : false;
     }
 
     /**
@@ -1068,43 +1118,43 @@ class App implements \ArrayAccess {
 
         switch(strtolower($type)){
             case 'ajax':
-            return (
-                (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'))       ||
-                (isset($_SERVER["CONTENT_TYPE"]) && stripos($_SERVER["CONTENT_TYPE"],'application/json')!==false)           ||
-                (isset($_SERVER["HTTP_CONTENT_TYPE"]) && stripos($_SERVER["HTTP_CONTENT_TYPE"],'application/json')!==false)
-            );
-            break;
+                return (
+                    (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && ($_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest'))       ||
+                    (isset($_SERVER["CONTENT_TYPE"]) && stripos($_SERVER["CONTENT_TYPE"],'application/json')!==false)           ||
+                    (isset($_SERVER["HTTP_CONTENT_TYPE"]) && stripos($_SERVER["HTTP_CONTENT_TYPE"],'application/json')!==false)
+                );
+                break;
 
             case 'mobile':
 
-            $mobileDevices = [
-                "midp","240x320","blackberry","netfront","nokia","panasonic","portalmmm","sharp","sie-","sonyericsson",
-                "symbian","windows ce","benq","mda","mot-","opera mini","philips","pocket pc","sagem","samsung",
-                "sda","sgh-","vodafone","xda","iphone", "ipod","android"
-            ];
+                $mobileDevices = [
+                    'midp','240x320','blackberry','netfront','nokia','panasonic','portalmmm','sharp','sie-','sonyericsson',
+                    'symbian','windows ce','benq','mda','mot-','opera mini','philips','pocket pc','sagem','samsung',
+                    'sda','sgh-','vodafone','xda','iphone', 'ipod','android'
+                ];
 
-            return preg_match('/(' . implode('|', $mobileDevices). ')/i',strtolower($_SERVER['HTTP_USER_AGENT']));
-            break;
+                return preg_match('/(' . implode('|', $mobileDevices). ')/i',strtolower($_SERVER['HTTP_USER_AGENT']));
+                break;
 
             case 'post':
-            return (strtolower($_SERVER['REQUEST_METHOD']) == 'post');
-            break;
+                return (strtolower($_SERVER['REQUEST_METHOD']) == 'post');
+                break;
 
             case 'get':
-            return (strtolower($_SERVER['REQUEST_METHOD']) == 'get');
-            break;
+                return (strtolower($_SERVER['REQUEST_METHOD']) == 'get');
+                break;
 
             case 'put':
-            return (strtolower($_SERVER['REQUEST_METHOD']) == 'put');
-            break;
+                return (strtolower($_SERVER['REQUEST_METHOD']) == 'put');
+                break;
 
             case 'delete':
-            return (strtolower($_SERVER['REQUEST_METHOD']) == 'delete');
-            break;
+                return (strtolower($_SERVER['REQUEST_METHOD']) == 'delete');
+                break;
 
             case 'ssl':
-            return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-            break;
+                return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+                break;
         }
 
         return false;
@@ -1150,16 +1200,10 @@ class App implements \ArrayAccess {
     */
     public function getSiteUrl($withpath = false) {
 
-        $url = ($this->req_is('ssl') ? 'https':'http').'://';
-
-        if (!in_array($this->registry['base_port'], ['80', '443'])) {
-            $url .= $this->registry['base_host'].":".$this->registry['base_port'];
-        } else {
-            $url .= $this->registry['base_host'];
-        }
+        $url = $this->registry['site_url'];
 
         if ($withpath) {
-            $url .= implode("/", array_slice(explode("/", $_SERVER['SCRIPT_NAME']), 0, -1));
+            $url .= implode('/', array_slice(explode('/', $_SERVER['SCRIPT_NAME']), 0, -1));
         }
 
         return rtrim($url, '/');
@@ -1234,14 +1278,14 @@ class App implements \ArrayAccess {
     }
 
     public function module($name) {
-        return $this->registry["modules"]->offsetExists($name) && $this->registry["modules"][$name] ? $this->registry["modules"][$name] : null;
+        return $this->registry['modules']->offsetExists($name) && $this->registry['modules'][$name] ? $this->registry['modules'][$name] : null;
     }
 
     public function registerModule($name, $dir) {
 
         $name = strtolower($name);
 
-        if (!isset($this->registry["modules"][$name])) {
+        if (!isset($this->registry['modules'][$name])) {
 
             $module = new Module($this);
 
@@ -1249,19 +1293,18 @@ class App implements \ArrayAccess {
             $module->_bootfile = "{$dir}/bootstrap.php";
 
             $this->path($name, $dir);
-
-            $this->registry["modules"][$name] = $module;
-
+            $this->registry['modules'][$name] = $module;
             $this->bootModule($module);
         }
 
-        return $this->registry["modules"][$name];
+        return $this->registry['modules'][$name];
     }
 
     public function loadModules($dirs, $autoload = true, $prefix = false) {
 
-        $modules = [];
-        $dirs    = (array)$dirs;
+        $modules  = [];
+        $dirs     = (array)$dirs;
+        $disabled = $this->registry['modules.disabled'] ?? null;
 
         foreach ($dirs as &$dir) {
 
@@ -1276,13 +1319,14 @@ class App implements \ArrayAccess {
 
                     $name = $prefix ? "{$pfx}-".$module->getBasename() : $module->getBasename();
 
+                    if ($disabled && in_array($name, $disabled)) continue;
+
                     $this->registerModule($name, $module->getRealPath());
 
                     $modules[] = strtolower($module);
                 }
 
-                if ($autoload) $this["autoload"]->append($dir);
-
+                if ($autoload) $this['autoload']->append($dir);
             }
         }
 
@@ -1335,9 +1379,9 @@ class App implements \ArrayAccess {
 
 
 class Response {
-    public $body    = "";
+    public $body    = '';
     public $status  = 200;
-    public $mime    = "html";
+    public $mime    = 'html';
     public $gzip    = false;
     public $nocache = false;
     public $etag    = false;
@@ -1351,9 +1395,16 @@ class Response {
 
         if (!headers_sent($filename, $linenum)) {
 
+            $body = $this->body;
+
+            if (is_array($this->body) || is_object($this->body)) {
+                $body = json_encode($this->body);
+                $this->mime = 'json';
+            }
+
             if ($this->nocache){
-                header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
-                header("Expires: Sat, 26 Jul 1997 05:00:00 GMT");
+                header('Cache-Control: no-cache, must-revalidate'); // HTTP/1.1
+                header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
                 header('Pragma: no-cache');
             }
 
@@ -1368,7 +1419,7 @@ class Response {
                 header($h);
             }
 
-            echo is_array($this->body) ? json_encode($this->body) : $this->body;
+            echo $body;
         }
     }
 }
@@ -1402,7 +1453,7 @@ class AppAware {
         return $this->app->helper($helper);
     }
 
-    // accces to services
+    // acccess to services
     public function __get($name) {
         return $this->app[$name];
     }
@@ -1411,11 +1462,11 @@ class AppAware {
 
 class Module extends AppAware {
 
-    protected $apis = array();
+    protected $apis = [];
 
     public function extend($api) {
 
-        foreach($api as $name => $value) {
+        foreach ($api as $name => $value) {
 
             if ($value instanceof \Closure) {
                 $value = $value->bindTo($this, $this);
@@ -1426,7 +1477,6 @@ class Module extends AppAware {
     }
 
     public function __set($name , $value) {
-
         $this->extend(array($name => $value));
     }
     public function __get($name) {
@@ -1440,11 +1490,11 @@ class Module extends AppAware {
     }
     public function __call($name, $arguments) {
 
-        if(isset($this->apis[$name]) && is_callable($this->apis[$name])) {
+        if (isset($this->apis[$name]) && is_callable($this->apis[$name])) {
             return call_user_func_array($this->apis[$name], $arguments);
         }
 
-        if(isset($this->apis['__call']) && is_callable($this->apis['__call'])) {
+        if (isset($this->apis['__call']) && is_callable($this->apis['__call'])) {
             return call_user_func_array($this->apis['__call'], [$name, $arguments]);
         }
 
@@ -1501,13 +1551,13 @@ class Cache extends Helper {
 
 
     public function initialize(){
-        $this->cachePath = rtrim(sys_get_temp_dir(),"/\\")."/";
+        $this->cachePath = rtrim(sys_get_temp_dir(),"/\\").'/';
         $this->prefix    = $this->app['app.name'];
     }
 
     public function setCachePath($path){
         if ($path) {
-            $this->cachePath = rtrim($this->app->path($path), "/\\")."/";
+            $this->cachePath = rtrim($this->app->path($path), "/\\").'/';
         }
     }
 
@@ -1529,6 +1579,7 @@ class Cache extends Helper {
     }
 
     public function read($key, $default=null){
+
         $var = @file_get_contents($this->cachePath.md5($this->prefix.'-'.$key).".cache");
 
         if ($var==='') {
@@ -1561,7 +1612,7 @@ class Cache extends Helper {
 
         $iterator = new \RecursiveDirectoryIterator($this->cachePath);
 
-        foreach($iterator as $file) {
+        foreach ($iterator as $file) {
             if ($file->isFile() && substr($file, -6)==".cache") {
                 @unlink($this->cachePath.$file->getFilename());
             }
@@ -1613,5 +1664,5 @@ function fetch_from_array(&$array, $index=null, $default = null) {
         }
     }
 
-    return $default;
+    return is_callable($default) ? call_user_func($default) : $default;
 }
