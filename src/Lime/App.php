@@ -261,7 +261,7 @@ class App implements \ArrayAccess {
     * @param  String $name Lime app name
     * @return Object       Lime app object
     */
-    public static function instance($name) {
+    public static function instance($name = 'LimeApp') {
         return self::$apps[$name];
     }
 
